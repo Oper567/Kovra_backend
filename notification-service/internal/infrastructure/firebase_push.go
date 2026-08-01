@@ -3,8 +3,6 @@ package infrastructure
 import (
 	"context"
 	"log/slog"
-
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/domain"
 )
 
 // MockFirebaseProvider logs notifications to stdout instead of actually sending them.
