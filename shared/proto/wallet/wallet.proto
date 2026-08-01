@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package wallet;
+
+option go_package = "github.com/kovra-dev/kovra/backend/shared/proto/wallet";
+
+import "google/protobuf/timestamp.proto";
+
+// ─── Wallet gRPC Service ─────────────────────────────────────
+// Internal-only API for inter-service communication.
+// Not exposed through the API Gateway.
+
+service WalletService {
+    // Check a user's wallet balance (non-blocking read).
+    rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+
+    // Debit wallet as part of a Saga. Creates a compensation record
+    // that can be rolled back via CompensateSaga.
+    rpc DebitForSaga(DebitForSagaRequest) returns (DebitForSagaResponse);
+
+    // Credit wallet (e.g., refund, top-up confirmation).
+    rpc CreditWallet(CreditWalletRequest) returns (CreditWalletResponse);
+
+    // Rollback a saga debit. Atomically credits the amount back
+    // and marks the saga as COMPENSATED.
+    rpc CompensateSaga(CompensateSagaRequest) returns (CompensateSagaResponse);
+
+    // Mark a saga as successfully completed (no rollback needed).
+    rpc CompleteSaga(CompleteSagaRequest) returns (CompleteSagaResponse);
+}
+
+// ─── Messages ────────────────────────────────────────────────
+
+message GetBalanceRequest {
+    string user_id = 1;
+}
+
+message GetBalanceResponse {
+    string wallet_id = 1;
+    string balance = 2;      // Decimal as string to avoid floating-point issues
+    string currency = 3;
+    int32  version = 4;
+}
+
+message DebitForSagaRequest {
+    string saga_id = 1;
+    string user_id = 2;
+    string amount = 3;       // Decimal as string
+    string channel = 4;      // e.g., "VTU_PURCHASE", "ECOM_ORDER"
+    string description = 5;
+    string idempotency_key = 6;
+    map<string, string> metadata = 7;
+}
+
+message DebitForSagaResponse {
+    string transaction_id = 1;
+    string new_balance = 2;
+    string saga_id = 3;
+}
+
+message CreditWalletRequest {
+    string user_id = 1;
+    string amount = 2;
+    string channel = 3;
+    string description = 4;
+    string idempotency_key = 5;
+    string reference_id = 6;
+    map<string, string> metadata = 7;
+}
+
+message CreditWalletResponse {
+    string transaction_id = 1;
+    string new_balance = 2;
+}
+
+message CompensateSagaRequest {
+    string saga_id = 1;
+    string reason = 2;
+}
+
+message CompensateSagaResponse {
+    string transaction_id = 1;   // The reversal transaction
+    string refunded_amount = 2;
+    string new_balance = 3;
+}
+
+message CompleteSagaRequest {
+    string saga_id = 1;
+}
+
+message CompleteSagaResponse {
+    bool success = 1;
+}

@@ -1,0 +1,53 @@
+# Stage 1: Build all microservices
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+# Install required build tools
+RUN apk add --no-cache build-base
+
+# We copy the entire backend directory to resolve all go.mod and local modules easily
+# Alternatively, since each has its own go.mod, we can build them separately.
+# For simplicity, we just copy everything.
+COPY . .
+
+# Build API Gateway
+WORKDIR /app/api-gateway
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/api-gateway ./cmd/server/main.go
+
+# Build Wallet Service
+WORKDIR /app/wallet-service
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/wallet-service ./cmd/server/main.go
+
+# Build Notification Service
+WORKDIR /app/notification-service
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/notification-service ./cmd/server/main.go
+
+# Stage 2: Create a minimal final image
+FROM alpine:3.19
+
+WORKDIR /app
+
+# Install CA certificates for external API calls
+RUN apk --no-cache add ca-certificates
+
+# Copy the compiled binaries from the builder stage
+COPY --from=builder /bin/api-gateway ./api-gateway
+COPY --from=builder /bin/wallet-service ./wallet-service
+COPY --from=builder /bin/notification-service ./notification-service
+
+# Copy the start script
+COPY start_all.sh ./start_all.sh
+
+# Make sure it's executable
+RUN chmod +x ./start_all.sh
+
+# The API Gateway binds to GATEWAY_PORT (default 8080)
+# Wallet and Notification bind to 8081 and 8087 respectively.
+EXPOSE 8080
+
+# Start everything!
+CMD ["./start_all.sh"]
