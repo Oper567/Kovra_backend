@@ -38,8 +38,10 @@ func (h *WalletHandler) RegisterRoutes(r *gin.RouterGroup) {
 		wallet.POST("/credit", h.CreditWallet)
 		wallet.GET("/transactions", h.GetTransactions)
 		wallet.POST("/fund/initialize", h.FundInitialize)
-		wallet.POST("/webhook/paystack", h.PaystackWebhook)
 	}
+	
+	// Webhooks
+	r.POST("/paystack-webhook", h.PaystackWebhook)
 }
 
 // ─── Request/Response DTOs ──────────────────────────────────

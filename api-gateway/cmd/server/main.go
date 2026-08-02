@@ -132,7 +132,7 @@ func main() {
 		// pub.POST("/auth/refresh", emailAuthHandler.Refresh) // TODO: Implement token refresh if needed
 
 		// Public Wallet Webhooks (Paystack)
-		pub.POST("/wallet/webhook/paystack", middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
+		pub.POST("/paystack-webhook", middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
 
 		// Public product catalog
 		pub.Any("/shop/products", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
