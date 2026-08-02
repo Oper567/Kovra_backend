@@ -409,7 +409,14 @@ func (h *WalletHandler) SagaDebit(c *gin.Context) {
 		return
 	}
 
-	result, err := h.uc.DebitForSaga(c.Request.Context(), req.SagaID, req.UserID, req.Amount, domain.TransactionChannel(req.Channel), req.Description, req.IdempotencyKey)
+	result, err := h.uc.DebitForSaga(c.Request.Context(), usecase.DebitSagaRequest{
+		SagaID:         req.SagaID,
+		UserID:         req.UserID,
+		Amount:         req.Amount,
+		Channel:        domain.TransactionChannel(req.Channel),
+		Description:    req.Description,
+		IdempotencyKey: req.IdempotencyKey,
+	})
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -418,7 +425,7 @@ func (h *WalletHandler) SagaDebit(c *gin.Context) {
 	c.JSON(http.StatusOK, APIResponse{
 		Success: true,
 		Data: gin.H{
-			"transaction_id": result.Transaction.ID,
+			"transaction_id": result.TransactionID,
 			"new_balance":    result.NewBalance,
 		},
 	})
@@ -436,7 +443,7 @@ func (h *WalletHandler) SagaCompensate(c *gin.Context) {
 		return
 	}
 
-	err := h.uc.CompensateSaga(c.Request.Context(), req.SagaID, req.Reason)
+	_, err := h.uc.CompensateSaga(c.Request.Context(), req.SagaID, req.Reason)
 	if err != nil {
 		h.handleError(c, err)
 		return
