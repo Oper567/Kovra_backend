@@ -66,6 +66,8 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 			CONSTRAINT unique_provider_id UNIQUE (provider, provider_id)
 		);
 		ALTER TABLE users ALTER COLUMN provider SET DEFAULT 'email';
+		ALTER TABLE users ALTER COLUMN provider_id DROP NOT NULL;
+		ALTER TABLE users ALTER COLUMN provider_id SET DEFAULT '';
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 		`
 		if _, err := db.Exec(schemaSQL); err != nil {
@@ -126,16 +128,16 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 	// Insert into DB as unverified (try with auto id first, fallback to Go-generated UUID)
 	var userID string
 	err = h.DB.QueryRowContext(c.Request.Context(), `
-		INSERT INTO users (email, password_hash, full_name, is_verified, provider)
-		VALUES ($1, $2, $3, false, 'email')
+		INSERT INTO users (email, password_hash, full_name, is_verified, provider, provider_id)
+		VALUES ($1, $2, $3, false, 'email', '')
 		RETURNING id
 	`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
 	if err != nil {
 		h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
 		genID := generateUUID()
 		err = h.DB.QueryRowContext(c.Request.Context(), `
-			INSERT INTO users (id, email, password_hash, full_name, is_verified, provider)
-			VALUES ($1, $2, $3, $4, false, 'email')
+			INSERT INTO users (id, email, password_hash, full_name, is_verified, provider, provider_id)
+			VALUES ($1, $2, $3, $4, false, 'email', '')
 			RETURNING id
 		`, genID, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
 	}
