@@ -33,14 +33,19 @@ type Config struct {
 
 	// Email config
 	ResendAPIKey string
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPass     string
+	SMTPFrom     string
 
 	// Downstream service addresses
-	WalletServiceURL    string
-	VTUServiceURL       string
-	EcomServiceURL      string
-	EdtechServiceURL    string
-	AIServiceURL        string
-	EngagementServiceURL string
+	WalletServiceURL       string
+	VTUServiceURL          string
+	EcomServiceURL         string
+	EdtechServiceURL       string
+	AIServiceURL           string
+	EngagementServiceURL   string
 	NotificationServiceURL string
 }
 
@@ -69,13 +74,18 @@ func Load() *Config {
 		OAuthCallbackURL:   envOr("OAUTH_CALLBACK_URL", "http://localhost:8080/api/v1/auth/google/callback"),
 
 		ResendAPIKey: envOr("RESEND_API_KEY", ""),
+		SMTPHost:     envOr("SMTP_HOST", ""),
+		SMTPPort:     envOr("SMTP_PORT", "587"),
+		SMTPUser:     envOr("SMTP_USER", ""),
+		SMTPPass:     envOr("SMTP_PASS", ""),
+		SMTPFrom:     envOr("SMTP_FROM", "noreply@kovra.com"),
 
-		WalletServiceURL:     envOr("WALLET_SERVICE_URL", "http://localhost:8081"),
-		VTUServiceURL:        envOr("VTU_SERVICE_URL", "http://localhost:8082"),
-		EcomServiceURL:       envOr("ECOM_SERVICE_URL", "http://localhost:8083"),
-		EdtechServiceURL:     envOr("EDTECH_SERVICE_URL", "http://localhost:8084"),
-		AIServiceURL:         envOr("AI_SERVICE_URL", "http://localhost:8085"),
-		EngagementServiceURL: envOr("ENGAGEMENT_SERVICE_URL", "http://localhost:8086"),
+		WalletServiceURL:       envOr("WALLET_SERVICE_URL", "http://localhost:8081"),
+		VTUServiceURL:          envOr("VTU_SERVICE_URL", "http://localhost:8082"),
+		EcomServiceURL:         envOr("ECOM_SERVICE_URL", "http://localhost:8083"),
+		EdtechServiceURL:       envOr("EDTECH_SERVICE_URL", "http://localhost:8084"),
+		AIServiceURL:           envOr("AI_SERVICE_URL", "http://localhost:8085"),
+		EngagementServiceURL:   envOr("ENGAGEMENT_SERVICE_URL", "http://localhost:8086"),
 		NotificationServiceURL: envOr("NOTIFICATION_SERVICE_URL", "http://localhost:8087"),
 	}
 }

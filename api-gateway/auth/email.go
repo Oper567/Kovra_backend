@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net/http"
+	"net/smtp"
 	"strings"
 	"time"
 
@@ -308,6 +309,27 @@ func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email stri
 	err = h.RDB.Set(ctx, redisKey, code, 15*time.Minute).Err()
 	if err != nil {
 		return err
+	}
+
+	if h.Config.SMTPHost != "" {
+		// Use standard SMTP
+		auth := smtp.PlainAuth("", h.Config.SMTPUser, h.Config.SMTPPass, h.Config.SMTPHost)
+		from := h.Config.SMTPFrom
+		if from == "" {
+			from = "noreply@kovra.com"
+		}
+		to := []string{email}
+		msg := []byte("To: " + email + "\r\n" +
+			"Subject: Your Kovra Verification Code\r\n" +
+			"Content-Type: text/html; charset=UTF-8\r\n\r\n" +
+			fmt.Sprintf("<p>Your verification code is: <strong>%s</strong></p><p>This code expires in 15 minutes.</p>", code))
+			
+		err := smtp.SendMail(h.Config.SMTPHost+":"+h.Config.SMTPPort, auth, from, to, msg)
+		if err != nil {
+			h.Logger.Error("failed to send via smtp", slog.String("error", err.Error()))
+			return fmt.Errorf("failed to send via smtp: %w", err)
+		}
+		return nil
 	}
 
 	if h.Resend == nil {
