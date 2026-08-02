@@ -35,6 +35,33 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 		resendClient = resend.NewClient(cfg.ResendAPIKey)
 	}
 
+	if db != nil {
+		schemaSQL := `
+		CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+		CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+		CREATE TABLE IF NOT EXISTS users (
+			id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			email         VARCHAR(255) NOT NULL UNIQUE,
+			password_hash VARCHAR(255),
+			full_name     VARCHAR(255),
+			avatar_url    TEXT,
+			is_verified   BOOLEAN NOT NULL DEFAULT FALSE,
+			provider      VARCHAR(50),
+			provider_id   VARCHAR(255),
+			role          VARCHAR(50) NOT NULL DEFAULT 'user',
+			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			CONSTRAINT unique_provider_id UNIQUE (provider, provider_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+		`
+		if _, err := db.Exec(schemaSQL); err != nil {
+			logger.Error("failed to ensure users schema initialized", slog.String("error", err.Error()))
+		} else {
+			logger.Info("users database schema initialized successfully")
+		}
+	}
+
 	return &EmailAuthHandler{
 		DB:     db,
 		RDB:    rdb,
