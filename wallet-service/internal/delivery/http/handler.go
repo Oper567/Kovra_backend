@@ -42,6 +42,14 @@ func (h *WalletHandler) RegisterRoutes(r *gin.RouterGroup) {
 	
 	// Webhooks
 	r.POST("/paystack-webhook", h.PaystackWebhook)
+
+	// Internal Saga Endpoints (called directly by other microservices)
+	saga := r.Group("/internal/wallet/saga")
+	{
+		saga.POST("/debit", h.SagaDebit)
+		saga.POST("/compensate", h.SagaCompensate)
+		saga.POST("/complete", h.SagaComplete)
+	}
 }
 
 // ─── Request/Response DTOs ──────────────────────────────────
@@ -381,4 +389,78 @@ func (h *WalletHandler) handleError(c *gin.Context, err error) {
 			Success: false, Error: "An internal error occurred", Code: "INTERNAL_ERROR",
 		})
 	}
+}
+
+// ─── Internal Saga Endpoints ─────────────────────────────────
+
+type SagaDebitRequest struct {
+	SagaID         string          `json:"saga_id" binding:"required"`
+	UserID         string          `json:"user_id" binding:"required"`
+	Amount         decimal.Decimal `json:"amount" binding:"required"`
+	Channel        string          `json:"channel" binding:"required"`
+	Description    string          `json:"description"`
+	IdempotencyKey string          `json:"idempotency_key" binding:"required"`
+}
+
+func (h *WalletHandler) SagaDebit(c *gin.Context) {
+	var req SagaDebitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	result, err := h.uc.DebitForSaga(c.Request.Context(), req.SagaID, req.UserID, req.Amount, domain.TransactionChannel(req.Channel), req.Description, req.IdempotencyKey)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data: gin.H{
+			"transaction_id": result.Transaction.ID,
+			"new_balance":    result.NewBalance,
+		},
+	})
+}
+
+type SagaCompensateRequest struct {
+	SagaID string `json:"saga_id" binding:"required"`
+	Reason string `json:"reason"`
+}
+
+func (h *WalletHandler) SagaCompensate(c *gin.Context) {
+	var req SagaCompensateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	err := h.uc.CompensateSaga(c.Request.Context(), req.SagaID, req.Reason)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{Success: true})
+}
+
+type SagaCompleteRequest struct {
+	SagaID string `json:"saga_id" binding:"required"`
+}
+
+func (h *WalletHandler) SagaComplete(c *gin.Context) {
+	var req SagaCompleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	err := h.uc.CompleteSaga(c.Request.Context(), req.SagaID)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{Success: true})
 }

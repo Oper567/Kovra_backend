@@ -17,9 +17,13 @@ SERVER_PORT=8081 GRPC_PORT=9081 ./wallet-service &
 echo "Starting Notification Service on port 8087..."
 SERVER_PORT=8087 ./notification-service &
 
+# 3. Start VTU & Gaming Service
+echo "Starting VTU & Gaming Service on port 8082..."
+SERVER_PORT=8082 ./vtu-gaming-service &
+
 # Wait a moment for services to bind
 sleep 2
 
-# 3. Start API Gateway (Runs in foreground to keep container alive)
+# 4. Start API Gateway (Runs in foreground to keep container alive)
 echo "Starting API Gateway on port $GATEWAY_PORT..."
 ./api-gateway
