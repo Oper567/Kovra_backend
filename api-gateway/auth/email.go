@@ -198,6 +198,9 @@ func (h *EmailAuthHandler) Verify(c *gin.Context) {
 		return
 	}
 
+	// Normalize email
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	// Get code from Redis
 	redisKey := fmt.Sprintf("verify:%s", req.Email)
 	storedCode, err := h.RDB.Get(c.Request.Context(), redisKey).Result()
@@ -263,6 +266,9 @@ func (h *EmailAuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
+
+	// Normalize email
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	var userID, passwordHash, fullName, role string
 	var isVerified bool
