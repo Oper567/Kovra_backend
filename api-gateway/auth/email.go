@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,17 @@ import (
 
 	"github.com/kovra-dev/kovra/backend/api-gateway/config"
 )
+
+func generateUUID() string {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return ""
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
 
 // EmailAuthHandler handles email/password registration, login, and verification.
 type EmailAuthHandler struct {
@@ -86,9 +98,12 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Normalize email
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
 	// Check if user exists
 	var exists bool
-	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", req.Email).Scan(&exists)
+	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = $1)", req.Email).Scan(&exists)
 	if err != nil {
 		h.Logger.Error("failed to check existing user", slog.String("error", err.Error()))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -107,7 +122,7 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Insert into DB as unverified
+	// Insert into DB as unverified (try with auto id first, fallback to Go-generated UUID)
 	var userID string
 	err = h.DB.QueryRowContext(c.Request.Context(), `
 		INSERT INTO users (email, password_hash, full_name, is_verified)
@@ -115,8 +130,22 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 		RETURNING id
 	`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
 	if err != nil {
-		h.Logger.Error("failed to insert user", slog.String("error", err.Error()))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
+		h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
+		genID := generateUUID()
+		err = h.DB.QueryRowContext(c.Request.Context(), `
+			INSERT INTO users (id, email, password_hash, full_name, is_verified)
+			VALUES ($1, $2, $3, $4, false)
+			RETURNING id
+		`, genID, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
+	}
+
+	if err != nil {
+		h.Logger.Error("failed to insert user after retry", slog.String("error", err.Error()), slog.String("email", req.Email))
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user: " + err.Error()})
 		return
 	}
 
