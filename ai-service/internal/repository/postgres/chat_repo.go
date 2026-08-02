@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/kovra-dev/kovra/backend/ai-service/internal/domain"
 	"github.com/kovra-dev/kovra/backend/ai-service/internal/usecase"
