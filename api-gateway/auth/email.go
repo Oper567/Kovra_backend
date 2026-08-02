@@ -58,13 +58,14 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 			full_name     VARCHAR(255),
 			avatar_url    TEXT,
 			is_verified   BOOLEAN NOT NULL DEFAULT FALSE,
-			provider      VARCHAR(50),
+			provider      VARCHAR(50) DEFAULT 'email',
 			provider_id   VARCHAR(255),
 			role          VARCHAR(50) NOT NULL DEFAULT 'user',
 			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			CONSTRAINT unique_provider_id UNIQUE (provider, provider_id)
 		);
+		ALTER TABLE users ALTER COLUMN provider SET DEFAULT 'email';
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 		`
 		if _, err := db.Exec(schemaSQL); err != nil {
@@ -125,16 +126,16 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 	// Insert into DB as unverified (try with auto id first, fallback to Go-generated UUID)
 	var userID string
 	err = h.DB.QueryRowContext(c.Request.Context(), `
-		INSERT INTO users (email, password_hash, full_name, is_verified)
-		VALUES ($1, $2, $3, false)
+		INSERT INTO users (email, password_hash, full_name, is_verified, provider)
+		VALUES ($1, $2, $3, false, 'email')
 		RETURNING id
 	`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
 	if err != nil {
 		h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
 		genID := generateUUID()
 		err = h.DB.QueryRowContext(c.Request.Context(), `
-			INSERT INTO users (id, email, password_hash, full_name, is_verified)
-			VALUES ($1, $2, $3, $4, false)
+			INSERT INTO users (id, email, password_hash, full_name, is_verified, provider)
+			VALUES ($1, $2, $3, $4, false, 'email')
 			RETURNING id
 		`, genID, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
 	}
@@ -245,7 +246,7 @@ func (h *EmailAuthHandler) Login(c *gin.Context) {
 	var isVerified bool
 	err := h.DB.QueryRowContext(c.Request.Context(), `
 		SELECT id, password_hash, full_name, role, is_verified 
-		FROM users WHERE email = $1 AND provider IS NULL
+		FROM users WHERE email = $1 AND (provider IS NULL OR provider = 'email' OR provider = 'local')
 	`, req.Email).Scan(&userID, &passwordHash, &fullName, &role, &isVerified)
 
 	if errors.Is(err, sql.ErrNoRows) {
