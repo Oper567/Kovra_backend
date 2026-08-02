@@ -115,7 +115,11 @@ func (uc *AIUsecase) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, 
 	}
 
 	// Call AI provider
-	reply, tokens, err := uc.aiProvider.ChatCompletion(systemPrompt, history)
+	var historyValues []domain.ChatMessage
+	for _, m := range history {
+		historyValues = append(historyValues, *m)
+	}
+	reply, tokens, err := uc.aiProvider.ChatCompletion(systemPrompt, historyValues)
 	if err != nil {
 		uc.logger.ErrorContext(ctx, "AI provider failed", slog.String("error", err.Error()))
 		reply = "I'm having trouble connecting right now. Please try again in a moment, or contact our support team for immediate help."
