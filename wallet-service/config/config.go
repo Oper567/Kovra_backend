@@ -14,6 +14,11 @@ type Config struct {
 	Redis    RedisConfig
 	GRPC     GRPCConfig
 	RabbitMQ RabbitMQConfig
+	Paystack PaystackConfig
+}
+
+type PaystackConfig struct {
+	SecretKey string
 }
 
 type ServerConfig struct {
@@ -84,6 +89,9 @@ func Load() *Config {
 		},
 		RabbitMQ: RabbitMQConfig{
 			URL: envOrDefault("RABBITMQ_URL", "amqp://kovra:kovra_mq_2024@localhost:5672/"),
+		},
+		Paystack: PaystackConfig{
+			SecretKey: envOrDefault("PAYSTACK_SECRET_KEY", ""),
 		},
 	}
 }

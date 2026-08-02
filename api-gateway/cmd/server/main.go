@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,8 +12,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/providers/google"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/kovra-dev/kovra/backend/api-gateway/auth"
 	"github.com/kovra-dev/kovra/backend/api-gateway/config"
 	"github.com/kovra-dev/kovra/backend/api-gateway/middleware"
 	"github.com/kovra-dev/kovra/backend/api-gateway/proxy"
@@ -24,6 +29,26 @@ func main() {
 	logger.Info("starting kovra api-gateway")
 
 	cfg := config.Load()
+
+	// ─── Database ───────────────────────────────────────────
+	db, err := sql.Open("postgres", cfg.DSN())
+	if err != nil {
+		logger.Error("failed to open database", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer db.Close()
+	if err := db.PingContext(context.Background()); err != nil {
+		logger.Error("failed to ping database", slog.String("error", err.Error()))
+	} else {
+		logger.Info("database connected", slog.String("host", cfg.DBHost))
+	}
+
+	// ─── OAuth Providers ────────────────────────────────────
+	if cfg.GoogleClientID != "" {
+		goth.UseProviders(
+			google.New(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthCallbackURL),
+		)
+	}
 
 	// ─── Redis ──────────────────────────────────────────────
 	rdb := redis.NewClient(&redis.Options{
@@ -56,6 +81,10 @@ func main() {
 	engageProxy := proxy.NewServiceProxy(cfg.EngagementServiceURL)
 	notifProxy := proxy.NewServiceProxy(cfg.NotificationServiceURL)
 
+	// ─── Handlers ───────────────────────────────────────────
+	oauthHandler := auth.NewOAuthHandler(db, cfg, logger)
+	emailAuthHandler := auth.NewEmailAuthHandler(db, rdb, cfg, logger)
+
 	// ─── Router ─────────────────────────────────────────────
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -68,15 +97,23 @@ func main() {
 			"status":  "healthy",
 			"service": "api-gateway",
 			"circuits": gin.H{
-				"wallet":     walletCB.State(),
-				"vtu":        vtuCB.State(),
-				"ecom":       ecomCB.State(),
-				"edtech":     edtechCB.State(),
-				"ai":         aiCB.State(),
-				"engagement": engageCB.State(),
+				"wallet":       walletCB.State(),
+				"vtu":          vtuCB.State(),
+				"ecom":         ecomCB.State(),
+				"edtech":       edtechCB.State(),
+				"ai":           aiCB.State(),
+				"engagement":   engageCB.State(),
 				"notification": notifCB.State(),
 			},
 		})
+	})
+
+	// Root path for Render health checks
+	r.HEAD("/", func(c *gin.Context) {
+		c.Status(200)
+	})
+	r.GET("/", func(c *gin.Context) {
+		c.String(200, "Kovra API Gateway is running")
 	})
 
 	// ─── Public Routes (no auth) ────────────────────────────
@@ -84,10 +121,18 @@ func main() {
 	pub.Use(middleware.OptionalJWTAuth(cfg.JWTSecret, cfg.JWTIssuer))
 	pub.Use(rateLimiter.Limit())
 	{
-		// Auth routes are handled directly by the gateway
-		pub.POST("/auth/register", handleRegister(cfg))
-		pub.POST("/auth/login", handleLogin(cfg))
-		pub.POST("/auth/refresh", handleRefresh(cfg))
+		// OAuth Routes
+		pub.GET("/auth/:provider", oauthHandler.BeginAuth)
+		pub.GET("/auth/:provider/callback", oauthHandler.Callback)
+
+		// Email Auth Routes
+		pub.POST("/auth/register", emailAuthHandler.Register)
+		pub.POST("/auth/verify", emailAuthHandler.Verify)
+		pub.POST("/auth/login", emailAuthHandler.Login)
+		// pub.POST("/auth/refresh", emailAuthHandler.Refresh) // TODO: Implement token refresh if needed
+
+		// Public Wallet Webhooks (Paystack)
+		pub.POST("/wallet/webhook/paystack", middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
 
 		// Public product catalog
 		pub.Any("/shop/products", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))

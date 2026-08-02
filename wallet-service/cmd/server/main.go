@@ -17,6 +17,7 @@ import (
 
 	"github.com/kovra-dev/kovra/backend/wallet-service/config"
 	httpdelivery "github.com/kovra-dev/kovra/backend/wallet-service/internal/delivery/http"
+	"github.com/kovra-dev/kovra/backend/wallet-service/internal/infrastructure"
 	"github.com/kovra-dev/kovra/backend/wallet-service/internal/repository/postgres"
 	"github.com/kovra-dev/kovra/backend/wallet-service/internal/usecase"
 )
@@ -60,6 +61,9 @@ func main() {
 	sagaRepo := postgres.NewSagaRepo(db)
 	uow := postgres.NewUnitOfWork(db)
 
+	// ─── Infrastructure ───────────────────────────────────────
+	paystackClient := infrastructure.NewPaystackClient(cfg.Paystack.SecretKey)
+
 	// ─── Usecase ────────────────────────────────────────────
 	walletUC := usecase.NewWalletUsecase(walletRepo, txnRepo, sagaRepo, uow, logger)
 
@@ -80,7 +84,7 @@ func main() {
 
 	// Register wallet routes
 	v1 := router.Group("/api/v1")
-	handler := httpdelivery.NewWalletHandler(walletUC)
+	handler := httpdelivery.NewWalletHandler(walletUC, paystackClient)
 	handler.RegisterRoutes(v1)
 
 	httpServer := &http.Server{

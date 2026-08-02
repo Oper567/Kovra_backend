@@ -1,0 +1,273 @@
+package auth
+
+import (
+	"context"
+	"crypto/rand"
+	"database/sql"
+	"errors"
+	"fmt"
+	"log/slog"
+	"math/big"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"github.com/resend/resend-go/v2"
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/kovra-dev/kovra/backend/api-gateway/config"
+)
+
+// EmailAuthHandler handles email/password registration, login, and verification.
+type EmailAuthHandler struct {
+	DB     *sql.DB
+	RDB    *redis.Client
+	Config *config.Config
+	Logger *slog.Logger
+	Resend *resend.Client
+}
+
+// NewEmailAuthHandler creates a new EmailAuthHandler.
+func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logger *slog.Logger) *EmailAuthHandler {
+	var resendClient *resend.Client
+	if cfg.ResendAPIKey != "" {
+		resendClient = resend.NewClient(cfg.ResendAPIKey)
+	}
+
+	return &EmailAuthHandler{
+		DB:     db,
+		RDB:    rdb,
+		Config: cfg,
+		Logger: logger,
+		Resend: resendClient,
+	}
+}
+
+// RegisterRequest represents the payload for registration.
+type RegisterRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+	FullName string `json:"full_name" binding:"required"`
+}
+
+// Register handles user signup.
+func (h *EmailAuthHandler) Register(c *gin.Context) {
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	// Check if user exists
+	var exists bool
+	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", req.Email).Scan(&exists)
+	if err != nil {
+		h.Logger.Error("failed to check existing user", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+	if exists {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		h.Logger.Error("failed to hash password", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+		return
+	}
+
+	// Insert into DB as unverified
+	var userID string
+	err = h.DB.QueryRowContext(c.Request.Context(), `
+		INSERT INTO users (email, password_hash, full_name, is_verified)
+		VALUES ($1, $2, $3, false)
+		RETURNING id
+	`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
+	if err != nil {
+		h.Logger.Error("failed to insert user", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
+		return
+	}
+
+	// Generate and send verification code
+	err = h.sendVerificationEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		h.Logger.Error("failed to send verification email", slog.String("error", err.Error()))
+		// We still return 201 Created because the account exists, but tell them email failed
+		c.JSON(http.StatusCreated, gin.H{"message": "User registered, but failed to send verification email. Please try logging in to resend."})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully. Please check your email for the verification code."})
+}
+
+// VerifyRequest represents the payload for email verification.
+type VerifyRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+// Verify verifies the 6-digit code sent to the user's email.
+func (h *EmailAuthHandler) Verify(c *gin.Context) {
+	var req VerifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	// Get code from Redis
+	redisKey := fmt.Sprintf("verify:%s", req.Email)
+	storedCode, err := h.RDB.Get(c.Request.Context(), redisKey).Result()
+	if errors.Is(err, redis.Nil) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Verification code expired or invalid"})
+		return
+	} else if err != nil {
+		h.Logger.Error("failed to get verification code from redis", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+		return
+	}
+
+	if storedCode != req.Code {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Incorrect verification code"})
+		return
+	}
+
+	// Update user in DB
+	var userID, role, fullName string
+	err = h.DB.QueryRowContext(c.Request.Context(), `
+		UPDATE users SET is_verified = true WHERE email = $1 RETURNING id, role, full_name
+	`, req.Email).Scan(&userID, &role, &fullName)
+	if err != nil {
+		h.Logger.Error("failed to update user verification status", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user"})
+		return
+	}
+
+	// Delete code from Redis
+	h.RDB.Del(c.Request.Context(), redisKey)
+
+	// Issue JWT
+	token, err := generateJWT(userID, req.Email, fullName, role, h.Config)
+	if err != nil {
+		h.Logger.Error("failed to generate jwt", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"token":   token,
+		"message": "Email verified successfully",
+		"user": gin.H{
+			"id":    userID,
+			"email": req.Email,
+			"name":  fullName,
+			"role":  role,
+		},
+	})
+}
+
+// LoginRequest represents the payload for login.
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+// Login authenticates a user and returns a JWT.
+func (h *EmailAuthHandler) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	var userID, passwordHash, fullName, role string
+	var isVerified bool
+	err := h.DB.QueryRowContext(c.Request.Context(), `
+		SELECT id, password_hash, full_name, role, is_verified 
+		FROM users WHERE email = $1 AND provider IS NULL
+	`, req.Email).Scan(&userID, &passwordHash, &fullName, &role, &isVerified)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	} else if err != nil {
+		h.Logger.Error("failed to query user for login", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	// Check if verified
+	if !isVerified {
+		// Optionally resend verification code here automatically or let them trigger it via another endpoint.
+		// For UX, auto-resending here is a good idea.
+		_ = h.sendVerificationEmail(c.Request.Context(), req.Email)
+		c.JSON(http.StatusForbidden, gin.H{"error": "Email not verified. A new verification code has been sent to your email."})
+		return
+	}
+
+	// Issue JWT
+	token, err := generateJWT(userID, req.Email, fullName, role, h.Config)
+	if err != nil {
+		h.Logger.Error("failed to generate jwt", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"token":   token,
+		"user": gin.H{
+			"id":    userID,
+			"email": req.Email,
+			"name":  fullName,
+			"role":  role,
+		},
+	})
+}
+
+func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email string) error {
+	// Generate 6-digit code
+	codeInt, err := rand.Int(rand.Reader, big.NewInt(900000))
+	if err != nil {
+		return err
+	}
+	code := fmt.Sprintf("%06d", codeInt.Int64()+100000)
+
+	// Save code in Redis with 15-minute TTL
+	redisKey := fmt.Sprintf("verify:%s", email)
+	err = h.RDB.Set(ctx, redisKey, code, 15*time.Minute).Err()
+	if err != nil {
+		return err
+	}
+
+	if h.Resend == nil {
+		h.Logger.Warn("Resend API key not set, skipping actual email sending", slog.String("code", code), slog.String("email", email))
+		return nil
+	}
+
+	// Send email via Resend
+	params := &resend.SendEmailRequest{
+		From:    "Kovra Auth <onboarding@resend.dev>", // Replace with verified domain in production
+		To:      []string{email},
+		Subject: "Your Kovra Verification Code",
+		Html:    fmt.Sprintf("<p>Your verification code is: <strong>%s</strong></p><p>This code expires in 15 minutes.</p>", code),
+	}
+
+	_, err = h.Resend.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("failed to send via resend: %w", err)
+	}
+
+	return nil
+}
