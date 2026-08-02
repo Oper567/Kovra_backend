@@ -124,6 +124,7 @@ func main() {
 		// OAuth Routes
 		pub.GET("/auth/:provider", oauthHandler.BeginAuth)
 		pub.GET("/auth/:provider/callback", oauthHandler.Callback)
+		pub.POST("/auth/:provider/callback", oauthHandler.TokenCallback)
 
 		// Email Auth Routes
 		pub.POST("/auth/register", emailAuthHandler.Register)
