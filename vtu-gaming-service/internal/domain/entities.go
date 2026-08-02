@@ -14,10 +14,10 @@ type VTUCategory string
 const (
 	CategoryAirtime     VTUCategory = "AIRTIME"
 	CategoryData        VTUCategory = "DATA"
-	CategoryGaming      VTUCategory = "GAMING"
 	CategoryTV          VTUCategory = "TV"
 	CategoryElectricity VTUCategory = "ELECTRICITY"
 	CategoryInternet    VTUCategory = "INTERNET"
+	CategoryEducation   VTUCategory = "EDUCATION"
 )
 
 type OrderStatus string

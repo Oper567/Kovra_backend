@@ -83,6 +83,9 @@ func main() {
 	handler := httpdelivery.NewVTUHandler(vtuUC)
 	handler.RegisterRoutes(v1)
 
+	adminHandler := httpdelivery.NewAdminVTUHandler(vtuUC)
+	adminHandler.RegisterRoutes(v1)
+
 	httpServer := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),
 		Handler:      router,

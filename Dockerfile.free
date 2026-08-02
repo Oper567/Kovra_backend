@@ -31,6 +31,11 @@ WORKDIR /app/vtu-gaming-service
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/vtu-gaming-service ./cmd/server/main.go
 
+# Build AI Service
+WORKDIR /app/ai-service
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/ai-service ./cmd/server/main.go
+
 # Stage 2: Create a minimal final image
 FROM alpine:3.19
 
@@ -44,6 +49,7 @@ COPY --from=builder /bin/api-gateway ./api-gateway
 COPY --from=builder /bin/wallet-service ./wallet-service
 COPY --from=builder /bin/notification-service ./notification-service
 COPY --from=builder /bin/vtu-gaming-service ./vtu-gaming-service
+COPY --from=builder /bin/ai-service ./ai-service
 
 # Copy the start script
 COPY start_all.sh ./start_all.sh

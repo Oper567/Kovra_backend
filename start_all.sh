@@ -8,6 +8,7 @@ export GATEWAY_PORT=${PORT:-8080}
 # Default downstream URLs for the API Gateway to route to localhost
 export WALLET_SERVICE_URL="http://127.0.0.1:8081"
 export VTU_SERVICE_URL="http://127.0.0.1:8082"
+export AI_SERVICE_URL="http://127.0.0.1:8085"
 export NOTIFICATION_SERVICE_URL="http://127.0.0.1:8087"
 
 # 1. Start Wallet Service
@@ -22,9 +23,13 @@ SERVER_PORT=8087 ./notification-service &
 echo "Starting VTU & Gaming Service on port 8082..."
 SERVER_PORT=8082 ./vtu-gaming-service &
 
+# 4. Start AI Service
+echo "Starting AI Service on port 8085..."
+SERVER_PORT=8085 PORT=8085 ./ai-service &
+
 # Wait a moment for services to bind
 sleep 2
 
-# 4. Start API Gateway (Runs in foreground to keep container alive)
+# 5. Start API Gateway (Runs in foreground to keep container alive)
 echo "Starting API Gateway on port $GATEWAY_PORT..."
 ./api-gateway

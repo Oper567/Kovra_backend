@@ -38,17 +38,19 @@ func (p *DatastationProvider) Execute(product *domain.Product, recipient string)
 
 	switch product.Category {
 	case domain.CategoryAirtime:
-		endpoint = "/api/vtu/"
+		endpoint = "/api/rechargepin/"
 		payload = map[string]any{
-			"network": product.ProviderCode, // e.g., "1" for MTN
-			"amount":  product.Amount.String(),
-			"phone":   recipient,
+			"network":        product.ProviderCode, // e.g., "1" for MTN
+			"network_amount": product.Amount.String(),
+			"quantity":       "1",
+			"name_on_card":   recipient,
 		}
 	case domain.CategoryData:
+		// Assuming standard Datastation data API structure
 		endpoint = "/api/data/"
 		payload = map[string]any{
 			"network": product.ProviderCode,
-			"plan":    product.ProviderCode, // e.g., "183"
+			"plan":    product.Metadata["plan_id"], // Data plan ID
 			"phone":   recipient,
 		}
 	case domain.CategoryElectricity:
@@ -58,6 +60,12 @@ func (p *DatastationProvider) Execute(product *domain.Product, recipient string)
 			"meter_no":    recipient,
 			"amount":      product.Amount.String(),
 			"meter_type":  "prepaid",
+		}
+	case domain.CategoryEducation:
+		endpoint = "/api/epin/"
+		payload = map[string]any{
+			"exam_name": product.ProviderCode,
+			"quantity":  "1",
 		}
 	default:
 		return "", nil, fmt.Errorf("unsupported product category for datastation: %s", product.Category)
@@ -106,4 +114,36 @@ func (p *DatastationProvider) Execute(product *domain.Product, recipient string)
 func (p *DatastationProvider) CheckStatus(providerRef string) (domain.OrderStatus, error) {
 	// Not fully implemented for Datastation yet
 	return domain.OrderCompleted, nil
+}
+
+func (p *DatastationProvider) ValidateMeter(meterNumber, discoName, meterType string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/ajax/validate_meter_number?meternumber=%s&disconame=%s&mtype=%s",
+		p.baseURL, meterNumber, discoName, meterType)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Token %s", p.apiKey))
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var responseData map[string]any
+	if err := json.Unmarshal(respBody, &responseData); err != nil {
+		return nil, fmt.Errorf("failed to parse validate meter response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return responseData, fmt.Errorf("datastation API error (status %d)", resp.StatusCode)
+	}
+
+	return responseData, nil
 }

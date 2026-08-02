@@ -99,3 +99,29 @@ func scanProduct(s scanner) (*domain.Product, error) {
 	}
 	return &p, nil
 }
+
+func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
+	query := `
+		INSERT INTO vtu_products (id, provider_id, category, name, description, amount, currency, provider_code, is_active, metadata)
+		VALUES (COALESCE($1, uuid_generate_v4()), $2, $3, $4, $5, $6, $7, $8, $9, '{}'::jsonb)
+		RETURNING id
+	`
+	err := r.db.QueryRowContext(ctx, query, p.ID, p.ProviderID, p.Category, p.Name, p.Description, p.Amount, p.Currency, p.ProviderCode, p.IsActive).Scan(&p.ID)
+	return err
+}
+
+func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
+	query := `
+		UPDATE vtu_products
+		SET name = $2, description = $3, amount = $4, is_active = $5, updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, p.ID, p.Name, p.Description, p.Amount, p.IsActive)
+	return err
+}
+
+func (r *ProductRepo) Delete(ctx context.Context, id string) error {
+	query := `UPDATE vtu_products SET is_active = false WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}

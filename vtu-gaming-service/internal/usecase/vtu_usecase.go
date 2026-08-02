@@ -36,6 +36,9 @@ type ProductRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.Product, error)
 	ListByCategory(ctx context.Context, category domain.VTUCategory) ([]*domain.Product, error)
 	ListAll(ctx context.Context) ([]*domain.Product, error)
+	Create(ctx context.Context, p *domain.Product) error
+	Update(ctx context.Context, p *domain.Product) error
+	Delete(ctx context.Context, id string) error
 }
 
 func NewVTUUsecase(
@@ -212,6 +215,34 @@ func (uc *VTUUsecase) ListProducts(ctx context.Context, category string) ([]*dom
 		return uc.productRepo.ListAll(ctx)
 	}
 	return uc.productRepo.ListByCategory(ctx, domain.VTUCategory(category))
+}
+
+func (uc *VTUUsecase) CreateProduct(ctx context.Context, product *domain.Product) error {
+	return uc.productRepo.Create(ctx, product)
+}
+
+func (uc *VTUUsecase) UpdateProduct(ctx context.Context, product *domain.Product) error {
+	return uc.productRepo.Update(ctx, product)
+}
+
+func (uc *VTUUsecase) DeleteProduct(ctx context.Context, id string) error {
+	return uc.productRepo.Delete(ctx, id)
+}
+
+func (uc *VTUUsecase) ValidateMeter(ctx context.Context, meterNumber, discoName, meterType string) (map[string]any, error) {
+	provider, ok := uc.providers["datastation"]
+	if !ok {
+		return nil, fmt.Errorf("datastation provider not configured")
+	}
+
+	type Validator interface {
+		ValidateMeter(meterNumber, discoName, meterType string) (map[string]any, error)
+	}
+
+	if p, ok := provider.(Validator); ok {
+		return p.ValidateMeter(meterNumber, discoName, meterType)
+	}
+	return nil, fmt.Errorf("provider does not support meter validation")
 }
 
 // ─── Order History ──────────────────────────────────────────

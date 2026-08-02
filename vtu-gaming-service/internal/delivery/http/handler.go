@@ -24,6 +24,7 @@ func (h *VTUHandler) RegisterRoutes(r *gin.RouterGroup) {
 		vtu.GET("/products", h.ListProducts)
 		vtu.POST("/purchase", h.Purchase)
 		vtu.GET("/orders", h.ListOrders)
+		vtu.GET("/validate-meter", h.ValidateMeter)
 	}
 }
 
@@ -109,4 +110,23 @@ func (h *VTUHandler) handleError(c *gin.Context, err error) {
 	} else {
 		c.JSON(http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
 	}
+}
+
+func (h *VTUHandler) ValidateMeter(c *gin.Context) {
+	meterNumber := c.Query("meternumber")
+	discoName := c.Query("disconame")
+	meterType := c.Query("mtype")
+
+	if meterNumber == "" || discoName == "" || meterType == "" {
+		c.JSON(http.StatusBadRequest, APIResponse{Success: false, Error: "missing required parameters: meternumber, disconame, mtype"})
+		return
+	}
+
+	res, err := h.uc.ValidateMeter(c.Request.Context(), meterNumber, discoName, meterType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{Success: true, Data: res})
 }
