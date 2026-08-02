@@ -1,6 +1,6 @@
 module github.com/kovra-dev/kovra/backend/notification-service
 
-go 1.22
+go 1.25.0
 
 require (
 	github.com/gin-gonic/gin v1.12.0
