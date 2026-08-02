@@ -337,9 +337,14 @@ func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email stri
 		return nil
 	}
 
+	from := h.Config.SMTPFrom
+	if from == "" || from == "noreply@kovra.com" {
+		from = "Kovra Auth <noreply@unismart.com.ng>"
+	}
+
 	// Send email via Resend
 	params := &resend.SendEmailRequest{
-		From:    "Kovra Auth <onboarding@resend.dev>", // Replace with verified domain in production
+		From:    from,
 		To:      []string{email},
 		Subject: "Your Kovra Verification Code",
 		Html:    fmt.Sprintf("<p>Your verification code is: <strong>%s</strong></p><p>This code expires in 15 minutes.</p>", code),

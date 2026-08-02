@@ -7,6 +7,7 @@ export GATEWAY_PORT=${PORT:-8080}
 
 # Default downstream URLs for the API Gateway to route to localhost
 export WALLET_SERVICE_URL="http://127.0.0.1:8081"
+export VTU_SERVICE_URL="http://127.0.0.1:8082"
 export NOTIFICATION_SERVICE_URL="http://127.0.0.1:8087"
 
 # 1. Start Wallet Service
