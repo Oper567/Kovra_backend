@@ -106,50 +106,69 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	// Check if user exists
-	var exists bool
-	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = $1)", req.Email).Scan(&exists)
-	if err != nil {
-		h.Logger.Error("failed to check existing user", slog.String("error", err.Error()))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-	if exists {
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
-		return
-	}
-
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		h.Logger.Error("failed to hash password", slog.String("error", err.Error()))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
-		return
-	}
-
-	// Insert into DB as unverified (try with auto id first, fallback to Go-generated UUID)
-	var userID string
-	err = h.DB.QueryRowContext(c.Request.Context(), `
-		INSERT INTO users (email, password_hash, full_name, is_verified, provider, provider_id)
-		VALUES ($1, $2, $3, false, 'email', '')
-		RETURNING id
-	`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
-	if err != nil {
-		h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
-		genID := generateUUID()
-		err = h.DB.QueryRowContext(c.Request.Context(), `
-			INSERT INTO users (id, email, password_hash, full_name, is_verified, provider, provider_id)
-			VALUES ($1, $2, $3, $4, false, 'email', '')
-			RETURNING id
-		`, genID, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
-	}
-
-	if err != nil {
-		h.Logger.Error("failed to insert user after retry", slog.String("error", err.Error()), slog.String("email", req.Email))
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {
+	var existingID string
+	var isVerified bool
+	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT id, is_verified FROM users WHERE LOWER(email) = $1", req.Email).Scan(&existingID, &isVerified)
+	
+	if err == nil {
+		if isVerified {
 			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user: " + err.Error()})
+		
+		// Unverified account exists, update it instead of returning 409
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			h.Logger.Error("failed to hash password", slog.String("error", err.Error()))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+			return
+		}
+		
+		_, err = h.DB.ExecContext(c.Request.Context(), "UPDATE users SET password_hash = $1, full_name = $2 WHERE id = $3", string(hashedPassword), req.FullName, existingID)
+		if err != nil {
+			h.Logger.Error("failed to update unverified user", slog.String("error", err.Error()))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			return
+		}
+	} else if errors.Is(err, sql.ErrNoRows) {
+		// Hash password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			h.Logger.Error("failed to hash password", slog.String("error", err.Error()))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+			return
+		}
+
+		// Insert into DB as unverified
+		var userID string
+		err = h.DB.QueryRowContext(c.Request.Context(), `
+			INSERT INTO users (email, password_hash, full_name, is_verified, provider, provider_id)
+			VALUES ($1, $2, $3, false, 'email', NULL)
+			RETURNING id
+		`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
+		
+		if err != nil {
+			h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
+			genID := generateUUID()
+			err = h.DB.QueryRowContext(c.Request.Context(), `
+				INSERT INTO users (id, email, password_hash, full_name, is_verified, provider, provider_id)
+				VALUES ($1, $2, $3, $4, false, 'email', NULL)
+				RETURNING id
+			`, genID, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
+		}
+
+		if err != nil {
+			h.Logger.Error("failed to insert user after retry", slog.String("error", err.Error()), slog.String("email", req.Email))
+			if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique") {
+				c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user: " + err.Error()})
+			return
+		}
+	} else {
+		h.Logger.Error("failed to check existing user", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
