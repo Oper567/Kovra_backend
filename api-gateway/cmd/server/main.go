@@ -64,13 +64,14 @@ func main() {
 	rateLimiter := middleware.NewRateLimiter(rdb, cfg.RateLimitPerMin)
 
 	// Circuit breakers (one per downstream service)
-	walletCB := middleware.NewCircuitBreaker(5, 30*time.Second)
-	vtuCB := middleware.NewCircuitBreaker(5, 30*time.Second)
-	ecomCB := middleware.NewCircuitBreaker(5, 30*time.Second)
-	edtechCB := middleware.NewCircuitBreaker(5, 30*time.Second)
-	aiCB := middleware.NewCircuitBreaker(5, 30*time.Second)
-	engageCB := middleware.NewCircuitBreaker(5, 30*time.Second)
-	notifCB := middleware.NewCircuitBreaker(5, 30*time.Second)
+	// Render cold starts take a long time, so we increase the max failures to 20
+	walletCB := middleware.NewCircuitBreaker(20, 30*time.Second)
+	vtuCB := middleware.NewCircuitBreaker(20, 30*time.Second)
+	ecomCB := middleware.NewCircuitBreaker(20, 30*time.Second)
+	edtechCB := middleware.NewCircuitBreaker(20, 30*time.Second)
+	aiCB := middleware.NewCircuitBreaker(20, 30*time.Second)
+	engageCB := middleware.NewCircuitBreaker(20, 30*time.Second)
+	notifCB := middleware.NewCircuitBreaker(20, 30*time.Second)
 
 	// ─── Service Proxies ────────────────────────────────────
 	walletProxy := proxy.NewServiceProxy(cfg.WalletServiceURL)
