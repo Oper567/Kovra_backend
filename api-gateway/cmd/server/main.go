@@ -17,16 +17,16 @@ import (
 	"github.com/markbates/goth/providers/google"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/kovra-dev/kovra/backend/api-gateway/auth"
-	"github.com/kovra-dev/kovra/backend/api-gateway/config"
-	"github.com/kovra-dev/kovra/backend/api-gateway/middleware"
-	"github.com/kovra-dev/kovra/backend/api-gateway/proxy"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/auth"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/config"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/middleware"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/proxy"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
-	logger.Info("starting kovra api-gateway")
+	logger.Info("starting lucepay api-gateway")
 
 	cfg := config.Load()
 
@@ -114,7 +114,7 @@ func main() {
 		c.Status(200)
 	})
 	r.GET("/", func(c *gin.Context) {
-		c.String(200, "Kovra API Gateway is running")
+		c.String(200, "Luce Pay API Gateway is running")
 	})
 
 	// ─── Public Routes (no auth) ────────────────────────────

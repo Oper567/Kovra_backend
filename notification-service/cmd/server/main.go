@@ -13,12 +13,12 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 
-	"github.com/kovra-dev/kovra/backend/notification-service/config"
-	deliveryHttp "github.com/kovra-dev/kovra/backend/notification-service/internal/delivery/http"
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/delivery/rabbitmq"
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/infrastructure"
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/repository"
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/config"
+	deliveryHttp "github.com/lucepay-dev/lucepay/backend/notification-service/internal/delivery/http"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/delivery/rabbitmq"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/infrastructure"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/repository"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/usecase"
 )
 
 func main() {

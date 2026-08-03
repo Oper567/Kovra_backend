@@ -52,8 +52,8 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:            envOr("GATEWAY_PORT", "8080"),
-		JWTSecret:       envOr("JWT_SECRET", "kovra-dev-secret-change-in-production"),
-		JWTIssuer:       envOr("JWT_ISSUER", "kovra-auth"),
+		JWTSecret:       envOr("JWT_SECRET", "lucepay-dev-secret-change-in-production"),
+		JWTIssuer:       envOr("JWT_ISSUER", "lucepay-auth"),
 		RedisAddr:       envOr("REDIS_ADDR", "localhost:6379"),
 		RedisPassword:   envOr("REDIS_PASSWORD", ""),
 		RedisDB:         envIntOr("REDIS_DB", 0),
@@ -64,9 +64,9 @@ func Load() *Config {
 
 		DBHost:     envOr("DB_HOST", "localhost"),
 		DBPort:     envOr("DB_PORT", "5432"),
-		DBUser:     envOr("DB_USER", "kovra"),
-		DBPassword: envOr("DB_PASSWORD", "kovra_secret_2024"),
-		DBName:     envOr("DB_NAME", "kovra_users"),
+		DBUser:     envOr("DB_USER", "lucepay"),
+		DBPassword: envOr("DB_PASSWORD", "lucepay_secret_2024"),
+		DBName:     envOr("DB_NAME", "lucepay_users"),
 		DBSSLMode:  envOr("DB_SSLMODE", "disable"),
 
 		GoogleClientID:     envOr("GOOGLE_CLIENT_ID", ""),
@@ -78,7 +78,7 @@ func Load() *Config {
 		SMTPPort:     envOr("SMTP_PORT", "587"),
 		SMTPUser:     envOr("SMTP_USER", ""),
 		SMTPPass:     envOr("SMTP_PASS", ""),
-		SMTPFrom:     envOr("SMTP_FROM", "noreply@kovra.com"),
+		SMTPFrom:     envOr("SMTP_FROM", "noreply@lucepay.com"),
 
 		WalletServiceURL:       envOr("WALLET_SERVICE_URL", "http://localhost:8081"),
 		VTUServiceURL:          envOr("VTU_SERVICE_URL", "http://localhost:8082"),

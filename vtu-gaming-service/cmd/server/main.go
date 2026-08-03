@@ -14,18 +14,18 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/config"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/domain"
-	httpdelivery "github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/delivery/http"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/infrastructure"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/repository/postgres"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/config"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/domain"
+	httpdelivery "github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/delivery/http"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/infrastructure"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/repository/postgres"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/usecase"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
-	logger.Info("starting kovra vtu-gaming-service")
+	logger.Info("starting lucepay vtu-gaming-service")
 
 	cfg := config.Load()
 
@@ -113,5 +113,5 @@ func main() {
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("HTTP server shutdown error", slog.String("error", err.Error()))
 	}
-	logger.Info("kovra vtu-gaming-service stopped gracefully")
+	logger.Info("lucepay vtu-gaming-service stopped gracefully")
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/kovra-dev/kovra/backend/wallet-service/internal/domain"
-	"github.com/kovra-dev/kovra/backend/wallet-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/internal/usecase"
 	"github.com/shopspring/decimal"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

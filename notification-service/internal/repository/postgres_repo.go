@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/domain"
 )
 
 type PostgresNotificationRepo struct {

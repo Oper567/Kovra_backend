@@ -15,11 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 
-	"github.com/kovra-dev/kovra/backend/wallet-service/config"
-	httpdelivery "github.com/kovra-dev/kovra/backend/wallet-service/internal/delivery/http"
-	"github.com/kovra-dev/kovra/backend/wallet-service/internal/infrastructure"
-	"github.com/kovra-dev/kovra/backend/wallet-service/internal/repository/postgres"
-	"github.com/kovra-dev/kovra/backend/wallet-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/config"
+	httpdelivery "github.com/lucepay-dev/lucepay/backend/wallet-service/internal/delivery/http"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/internal/infrastructure"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/internal/repository/postgres"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/internal/usecase"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
-	logger.Info("starting kovra wallet-service")
+	logger.Info("starting lucepay wallet-service")
 
 	// ─── Configuration ──────────────────────────────────────
 	cfg := config.Load()
@@ -128,7 +128,7 @@ func main() {
 		logger.Error("HTTP server shutdown error", slog.String("error", err.Error()))
 	}
 
-	logger.Info("kovra wallet-service stopped gracefully")
+	logger.Info("lucepay wallet-service stopped gracefully")
 }
 
 // requestLogger is a Gin middleware for structured request logging.

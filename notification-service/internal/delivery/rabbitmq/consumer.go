@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/usecase"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -29,7 +29,7 @@ func NewConsumer(url string, uc *usecase.NotificationUsecase, logger *slog.Logge
 	}
 
 	err = ch.ExchangeDeclare(
-		"kovra.events", // name
+		"lucepay.events", // name
 		"topic",        // type
 		true,           // durable
 		false,          // auto-deleted
@@ -65,7 +65,7 @@ func (c *Consumer) Start() error {
 	// Bind to topics we care about
 	topics := []string{"wallet.credited", "wallet.debited", "engagement.streak", "engagement.reward"}
 	for _, topic := range topics {
-		if err := c.ch.QueueBind(q.Name, topic, "kovra.events", false, nil); err != nil {
+		if err := c.ch.QueueBind(q.Name, topic, "lucepay.events", false, nil); err != nil {
 			return err
 		}
 	}

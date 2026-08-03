@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/domain"
 )
 
 type DatastationProvider struct {

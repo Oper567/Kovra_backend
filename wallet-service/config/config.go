@@ -72,9 +72,9 @@ func Load() *Config {
 		Database: DatabaseConfig{
 			Host:     envOrDefault("DB_HOST", "localhost"),
 			Port:     envOrDefault("DB_PORT", "5432"),
-			User:     envOrDefault("DB_USER", "kovra"),
-			Password: envOrDefault("DB_PASSWORD", "kovra_secret_2024"),
-			DBName:   envOrDefault("DB_NAME", "kovra_wallet"),
+			User:     envOrDefault("DB_USER", "lucepay"),
+			Password: envOrDefault("DB_PASSWORD", "lucepay_secret_2024"),
+			DBName:   envOrDefault("DB_NAME", "lucepay_wallet"),
 			SSLMode:  envOrDefault("DB_SSLMODE", "disable"),
 			MaxConns: envIntOrDefault("DB_MAX_CONNS", 25),
 			MinConns: envIntOrDefault("DB_MIN_CONNS", 5),
@@ -88,7 +88,7 @@ func Load() *Config {
 			Port: envOrDefault("GRPC_PORT", "9081"),
 		},
 		RabbitMQ: RabbitMQConfig{
-			URL: envOrDefault("RABBITMQ_URL", "amqp://kovra:kovra_mq_2024@localhost:5672/"),
+			URL: envOrDefault("RABBITMQ_URL", "amqp://lucepay:lucepay_mq_2024@localhost:5672/"),
 		},
 		Paystack: PaystackConfig{
 			SecretKey: envOrDefault("PAYSTACK_SECRET_KEY", ""),

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/domain"
 )
 
 type ChatRepository interface {
@@ -47,11 +47,11 @@ func NewAIUsecase(chatRepo ChatRepository, insightRepo InsightRepository, recRep
 	}
 }
 
-// GenerateKoviInsight orchestrates data fetching, prompt building, and LLM generation.
+// GenerateLuciInsight orchestrates data fetching, prompt building, and LLM generation.
 // It guarantees a fallback string on error so the client UI does not break.
-func (u *AIUsecase) GenerateKoviInsight(ctx context.Context, userID string, viewContext string) (string, error) {
+func (u *AIUsecase) GenerateLuciInsight(ctx context.Context, userID string, viewContext string) (string, error) {
 	// 1. Safe default fallback to prevent UI breakage
-	fallbackMsg := "I'm always here to help you navigate Kovra! 🐍"
+	fallbackMsg := "I'm always here to help you navigate Luce Pay! 🐍"
 
 	if u.provider == nil {
 		return fallbackMsg, nil
@@ -72,7 +72,7 @@ func (u *AIUsecase) GenerateKoviInsight(ctx context.Context, userID string, view
 	}
 
 	// 4. Strict Persona Injection (Required by System Instructions)
-	persona := `You are Kovi, the friendly, highly intelligent green cobra mascot for the Kovra Super App. Your job is to provide short, helpful, and encouraging insights (max 2 sentences). You must occasionally use emojis like 🐍, ✨, 📈, or 🛡️. Do not use markdown. Speak directly to the user.`
+	persona := `You are Luci, the friendly, highly intelligent green cobra mascot for the Luce Pay Super App. Your job is to provide short, helpful, and encouraging insights (max 2 sentences). You must occasionally use emojis like 🐍, ✨, 📈, or 🛡️. Do not use markdown. Speak directly to the user.`
 
 	// 5. Prompt Construction
 	prompt := fmt.Sprintf("%s\n\nCurrent Context: %s\nUser Data: %s\n\nGenerate the insight message:", persona, viewContext, userData)

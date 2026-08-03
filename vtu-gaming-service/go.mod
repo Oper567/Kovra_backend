@@ -1,4 +1,4 @@
-module github.com/kovra-dev/kovra/backend/vtu-gaming-service
+module github.com/lucepay-dev/lucepay/backend/vtu-gaming-service
 
 go 1.26.5
 

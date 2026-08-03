@@ -17,7 +17,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:              envOrDefault("SERVER_PORT", "8082"),
-		DatabaseURL:       envOrDefault("DATABASE_URL", "postgres://kovra:kovra_secret_2024@localhost:5432/kovra_wallet?sslmode=disable"),
+		DatabaseURL:       envOrDefault("DATABASE_URL", "postgres://lucepay:lucepay_secret_2024@localhost:5432/lucepay_wallet?sslmode=disable"),
 		WalletServiceURL:  envOrDefault("WALLET_SERVICE_URL", "http://localhost:8081"),
 		DatastationAPIKey: envOrDefault("DATASTATION_API_KEY", ""), // Passed via Render Env
 		ReadTimeout:       10 * time.Second,

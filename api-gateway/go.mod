@@ -1,4 +1,4 @@
-module github.com/kovra-dev/kovra/backend/api-gateway
+module github.com/lucepay-dev/lucepay/backend/api-gateway
 
 go 1.25.0
 

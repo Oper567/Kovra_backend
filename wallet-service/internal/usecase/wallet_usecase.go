@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kovra-dev/kovra/backend/wallet-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/wallet-service/internal/domain"
 	"github.com/shopspring/decimal"
 )
 

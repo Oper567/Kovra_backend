@@ -72,14 +72,14 @@ func (w *RetentionWorker) processInactiveUsers(ctx context.Context) {
 			continue
 		}
 
-		// Payload specifically designed to trigger the Kovi "Miss You" UI on the frontend
+		// Payload specifically designed to trigger the Luci "Miss You" UI on the frontend
 		err := w.pushSvc.SendPushNotification(
 			ctx,
 			deviceToken,
-			"Kovi misses you! 🐍",
+			"Luci misses you! 🐍",
 			"You almost broke our streak! Come back and claim your daily reward.",
 			map[string]string{
-				"action": "trigger_kovi_danger_streak",
+				"action": "trigger_luci_danger_streak",
 			},
 		)
 

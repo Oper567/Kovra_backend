@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/domain"
 )
 
 // VTUUsecase orchestrates the Saga flow for VTU purchases:

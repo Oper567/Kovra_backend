@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/domain"
-	"github.com/kovra-dev/kovra/backend/vtu-gaming-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/usecase"
 	"github.com/shopspring/decimal"
 )
 

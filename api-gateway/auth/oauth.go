@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kovra-dev/kovra/backend/api-gateway/config"
-	"github.com/kovra-dev/kovra/backend/api-gateway/middleware"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/config"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/middleware"
 	"github.com/markbates/goth/gothic"
 )
 
@@ -77,7 +77,7 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	// Generate Kovra JWT
+	// Generate Luce Pay JWT
 	token, err := generateJWT(userID, user.Email, user.Name, role, h.Config)
 	if err != nil {
 		h.Logger.Error("failed to generate jwt", slog.String("error", err.Error()))
@@ -185,7 +185,7 @@ func (h *OAuthHandler) TokenCallback(c *gin.Context) {
 		return
 	}
 
-	// Generate Kovra JWT
+	// Generate Luce Pay JWT
 	token, err := generateJWT(userID, googleUser.Email, googleUser.Name, role, h.Config)
 	if err != nil {
 		h.Logger.Error("failed to generate jwt", slog.String("error", err.Error()))

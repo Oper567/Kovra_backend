@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package wallet;
 
-option go_package = "github.com/kovra-dev/kovra/backend/shared/proto/wallet";
+option go_package = "github.com/lucepay-dev/lucepay/backend/shared/proto/wallet";
 
 import "google/protobuf/timestamp.proto";
 

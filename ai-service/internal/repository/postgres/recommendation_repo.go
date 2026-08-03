@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/domain"
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/usecase"
 )
 
 type recommendationRepo struct {

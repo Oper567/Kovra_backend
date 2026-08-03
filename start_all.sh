@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "Starting Kovra Microservices (Free-Tier Monolith Mode)..."
+echo "Starting Luce Pay Microservices (Free-Tier Monolith Mode)..."
 
 # Render provides the public port in $PORT. We need the API Gateway to bind to it.
 export GATEWAY_PORT=${PORT:-8080}

@@ -1,4 +1,4 @@
-module github.com/kovra-dev/kovra/backend/notification-service
+module github.com/lucepay-dev/lucepay/backend/notification-service
 
 go 1.25.0
 

@@ -1,4 +1,4 @@
-module github.com/kovra-dev/kovra/backend/wallet-service
+module github.com/lucepay-dev/lucepay/backend/wallet-service
 
 go 1.22
 

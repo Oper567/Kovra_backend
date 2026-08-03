@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/delivery/http"
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/infrastructure/gemini"
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/repository/postgres"
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/delivery/http"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/infrastructure/gemini"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/repository/postgres"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/usecase"
 )
 
 func main() {
@@ -68,7 +68,7 @@ func main() {
 		port = "8085"
 	}
 	
-	logger.Info(fmt.Sprintf("starting kovra ai-service on :%s", port))
+	logger.Info(fmt.Sprintf("starting lucepay ai-service on :%s", port))
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("failed to start server: %v", err)
 	}

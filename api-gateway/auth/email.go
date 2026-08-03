@@ -18,7 +18,7 @@ import (
 	"github.com/resend/resend-go/v2"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/kovra-dev/kovra/backend/api-gateway/config"
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/config"
 )
 
 func generateUUID() string {
@@ -341,11 +341,11 @@ func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email stri
 		auth := smtp.PlainAuth("", h.Config.SMTPUser, h.Config.SMTPPass, h.Config.SMTPHost)
 		from := h.Config.SMTPFrom
 		if from == "" {
-			from = "noreply@kovra.com"
+			from = "noreply@lucepay.com"
 		}
 		to := []string{email}
 		msg := []byte("To: " + email + "\r\n" +
-			"Subject: Your Kovra Verification Code\r\n" +
+			"Subject: Your Luce Pay Verification Code\r\n" +
 			"Content-Type: text/html; charset=UTF-8\r\n\r\n" +
 			fmt.Sprintf("<p>Your verification code is: <strong>%s</strong></p><p>This code expires in 15 minutes.</p>", code))
 			
@@ -363,15 +363,15 @@ func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email stri
 	}
 
 	from := h.Config.SMTPFrom
-	if from == "" || from == "noreply@kovra.com" {
-		from = "Kovra Auth <noreply@unismart.com.ng>"
+	if from == "" || from == "noreply@lucepay.com" {
+		from = "Luce Pay Auth <noreply@unismart.com.ng>"
 	}
 
 	// Send email via Resend
 	params := &resend.SendEmailRequest{
 		From:    from,
 		To:      []string{email},
-		Subject: "Your Kovra Verification Code",
+		Subject: "Your Luce Pay Verification Code",
 		Html:    fmt.Sprintf("<p>Your verification code is: <strong>%s</strong></p><p>This code expires in 15 minutes.</p>", code),
 	}
 

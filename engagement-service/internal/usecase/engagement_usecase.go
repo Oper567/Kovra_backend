@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/kovra-dev/kovra/backend/engagement-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/engagement-service/internal/domain"
 	"github.com/shopspring/decimal"
 )
 
@@ -301,7 +301,7 @@ func (uc *EngagementUsecase) awardCashback(ctx context.Context, userID, source s
 	idempKey := fmt.Sprintf("cashback-%s-%s-%d", userID, source, time.Now().UnixMilli())
 	txnID, err := uc.walletClient.CreditWallet(
 		userID, amount.String(), "WALLET_FUND",
-		fmt.Sprintf("Kovra Cashback: %s", desc), idempKey,
+		fmt.Sprintf("Luce Pay Cashback: %s", desc), idempKey,
 	)
 	if err != nil {
 		uc.logger.ErrorContext(ctx, "cashback wallet credit failed",

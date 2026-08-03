@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kovra-dev/kovra/backend/notification-service/internal/usecase"
+	"github.com/lucepay-dev/lucepay/backend/notification-service/internal/usecase"
 )
 
 type Handler struct {

@@ -9,7 +9,7 @@ import (
 
 // AIUsecase defines the interface for the AI logic tier.
 type AIUsecase interface {
-	GenerateKoviInsight(ctx context.Context, userID string, viewContext string) (string, error)
+	GenerateLuciInsight(ctx context.Context, userID string, viewContext string) (string, error)
 }
 
 // AIHandler handles HTTP requests for AI endpoints.
@@ -63,9 +63,9 @@ func (h *AIHandler) GetInsight(c *gin.Context) {
 	}
 
 	// Call the Usecase
-	// We ignore the error here because GenerateKoviInsight is guaranteed to return
+	// We ignore the error here because GenerateLuciInsight is guaranteed to return
 	// a safe fallback string instead of failing, ensuring the frontend UI mascot doesn't break.
-	msg, _ := h.usecase.GenerateKoviInsight(c.Request.Context(), uidStr, req.Context)
+	msg, _ := h.usecase.GenerateLuciInsight(c.Request.Context(), uidStr, req.Context)
 
 	// Return the Mascot Message
 	c.JSON(http.StatusOK, InsightResponse{

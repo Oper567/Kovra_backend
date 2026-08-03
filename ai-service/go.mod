@@ -1,4 +1,4 @@
-module github.com/kovra-dev/kovra/backend/ai-service
+module github.com/lucepay-dev/lucepay/backend/ai-service
 
 go 1.26.5
 

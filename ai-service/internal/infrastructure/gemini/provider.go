@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/domain"
+	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/domain"
 	"google.golang.org/api/option"
 )
 
