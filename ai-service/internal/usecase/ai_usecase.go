@@ -3,31 +3,47 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
+
+	"github.com/kovra-dev/kovra/backend/ai-service/internal/domain"
 )
 
-// InsightRepo handles fetching contextual data for the user from various domains.
-type InsightRepo interface {
-	GetWalletInsight(ctx context.Context, userID string) (string, error)
-	GetRewardsInsight(ctx context.Context, userID string) (string, error)
-	GetEdTechInsight(ctx context.Context, userID string) (string, error)
+type ChatRepository interface {
+	CreateSession(ctx context.Context, userID, title string) (*domain.ChatSession, error)
+	GetSession(ctx context.Context, sessionID string) (*domain.ChatSession, error)
+	ListSessions(ctx context.Context, userID string) ([]*domain.ChatSession, error)
+	AddMessage(ctx context.Context, msg *domain.ChatMessage) (*domain.ChatMessage, error)
+	GetMessages(ctx context.Context, sessionID string, limit int) ([]*domain.ChatMessage, error)
 }
 
-// GeminiProvider handles the interaction with the Google Gemini LLM API.
-type GeminiProvider interface {
-	GenerateContent(ctx context.Context, prompt string) (string, error)
+type InsightRepository interface {
+	Save(ctx context.Context, insight *domain.SpendingInsight) error
+	ListByUser(ctx context.Context, userID string, limit int) ([]*domain.SpendingInsight, error)
+	MarkRead(ctx context.Context, insightID string) error
+}
+
+type RecommendationRepository interface {
+	SaveBatch(ctx context.Context, recs []*domain.Recommendation) error
+	ListByUser(ctx context.Context, userID, recType string, limit int) ([]*domain.Recommendation, error)
+	Dismiss(ctx context.Context, recID string) error
 }
 
 type AIUsecase struct {
-	repo     InsightRepo
-	provider GeminiProvider
+	chatRepo    ChatRepository
+	insightRepo InsightRepository
+	recRepo     RecommendationRepository
+	provider    domain.AIProvider
+	logger      *slog.Logger
 }
 
-func NewAIUsecase(repo InsightRepo, provider GeminiProvider) *AIUsecase {
+func NewAIUsecase(chatRepo ChatRepository, insightRepo InsightRepository, recRepo RecommendationRepository, provider domain.AIProvider, logger *slog.Logger) *AIUsecase {
 	return &AIUsecase{
-		repo:     repo,
-		provider: provider,
+		chatRepo:    chatRepo,
+		insightRepo: insightRepo,
+		recRepo:     recRepo,
+		provider:    provider,
+		logger:      logger,
 	}
 }
 
@@ -37,28 +53,22 @@ func (u *AIUsecase) GenerateKoviInsight(ctx context.Context, userID string, view
 	// 1. Safe default fallback to prevent UI breakage
 	fallbackMsg := "I'm always here to help you navigate Kovra! 🐍"
 
+	if u.provider == nil {
+		return fallbackMsg, nil
+	}
+
 	// 2. Bound the entire operation to avoid hanging the UI
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
 	var userData string
-	var err error
 
-	// 3. Contextual Data Fetching
-	switch viewContext {
-	case "wallet_view":
-		userData, err = u.repo.GetWalletInsight(ctx, userID)
-	case "rewards_view":
-		userData, err = u.repo.GetRewardsInsight(ctx, userID)
-	case "edtech_view", "quiz_start":
-		userData, err = u.repo.GetEdTechInsight(ctx, userID)
-	default:
+	// Fetching recent insights
+	insights, err := u.insightRepo.ListByUser(ctx, userID, 3)
+	if err == nil && len(insights) > 0 {
+		userData = fmt.Sprintf("Recent insight: %s", insights[0].Title)
+	} else {
 		userData = "User is exploring the app."
-	}
-
-	if err != nil {
-		log.Printf("[AI Usecase] Warning: Failed to fetch data for %s: %v", viewContext, err)
-		userData = "User data unavailable at the moment."
 	}
 
 	// 4. Strict Persona Injection (Required by System Instructions)
@@ -68,9 +78,11 @@ func (u *AIUsecase) GenerateKoviInsight(ctx context.Context, userID string, view
 	prompt := fmt.Sprintf("%s\n\nCurrent Context: %s\nUser Data: %s\n\nGenerate the insight message:", persona, viewContext, userData)
 
 	// 6. Gemini LLM Generation
-	message, err := u.provider.GenerateContent(ctx, prompt)
+	message, _, err := u.provider.ChatCompletion(persona, []domain.ChatMessage{{Role: "user", Content: prompt}})
 	if err != nil {
-		log.Printf("[AI Usecase] Error generating content from Gemini: %v", err)
+		if u.logger != nil {
+			u.logger.Error("[AI Usecase] Error generating content from Gemini", "error", err)
+		}
 		// Return safe fallback silently
 		return fallbackMsg, nil
 	}
