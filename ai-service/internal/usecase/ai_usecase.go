@@ -3,231 +3,81 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"log"
 	"time"
-
-	"github.com/kovra-dev/kovra/backend/ai-service/internal/domain"
 )
 
-// AIUsecase orchestrates all AI features: chatbot, insights, recommendations.
+// InsightRepo handles fetching contextual data for the user from various domains.
+type InsightRepo interface {
+	GetWalletInsight(ctx context.Context, userID string) (string, error)
+	GetRewardsInsight(ctx context.Context, userID string) (string, error)
+	GetEdTechInsight(ctx context.Context, userID string) (string, error)
+}
+
+// GeminiProvider handles the interaction with the Google Gemini LLM API.
+type GeminiProvider interface {
+	GenerateContent(ctx context.Context, prompt string) (string, error)
+}
+
 type AIUsecase struct {
-	chatRepo    ChatRepository
-	insightRepo InsightRepository
-	recRepo     RecommendationRepository
-	aiProvider  domain.AIProvider
-	logger      *slog.Logger
+	repo     InsightRepo
+	provider GeminiProvider
 }
 
-type ChatRepository interface {
-	CreateSession(ctx context.Context, userID, title string) (*domain.ChatSession, error)
-	GetSession(ctx context.Context, sessionID string) (*domain.ChatSession, error)
-	ListSessions(ctx context.Context, userID string) ([]*domain.ChatSession, error)
-	AddMessage(ctx context.Context, msg *domain.ChatMessage) (*domain.ChatMessage, error)
-	GetMessages(ctx context.Context, sessionID string, limit int) ([]*domain.ChatMessage, error)
-}
-
-type InsightRepository interface {
-	Save(ctx context.Context, insight *domain.SpendingInsight) error
-	ListByUser(ctx context.Context, userID string, limit int) ([]*domain.SpendingInsight, error)
-	MarkRead(ctx context.Context, insightID string) error
-}
-
-type RecommendationRepository interface {
-	SaveBatch(ctx context.Context, recs []*domain.Recommendation) error
-	ListByUser(ctx context.Context, userID, recType string, limit int) ([]*domain.Recommendation, error)
-	Dismiss(ctx context.Context, recID string) error
-}
-
-func NewAIUsecase(
-	chatRepo ChatRepository,
-	insightRepo InsightRepository,
-	recRepo RecommendationRepository,
-	aiProvider domain.AIProvider,
-	logger *slog.Logger,
-) *AIUsecase {
+func NewAIUsecase(repo InsightRepo, provider GeminiProvider) *AIUsecase {
 	return &AIUsecase{
-		chatRepo:    chatRepo,
-		insightRepo: insightRepo,
-		recRepo:     recRepo,
-		aiProvider:  aiProvider,
-		logger:      logger,
+		repo:     repo,
+		provider: provider,
 	}
 }
 
-// ─── Chat (AI Customer Support) ─────────────────────────────
+// GenerateKoviInsight orchestrates data fetching, prompt building, and LLM generation.
+// It guarantees a fallback string on error so the client UI does not break.
+func (u *AIUsecase) GenerateKoviInsight(ctx context.Context, userID string, viewContext string) (string, error) {
+	// 1. Safe default fallback to prevent UI breakage
+	fallbackMsg := "I'm always here to help you navigate Kovra! 🐍"
 
-const systemPrompt = `You are Kovra AI, a helpful assistant for the Kovra super app.
-You help users with:
-- Wallet questions (balance, transactions, funding)
-- VTU purchases (airtime, data, gaming credits)
-- E-commerce orders and tracking
-- Course enrollment and quiz help
-- Referral program and rewards
+	// 2. Bound the entire operation to avoid hanging the UI
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
 
-Be friendly, concise, and always guide users toward taking action in the app.
-If you don't know something, suggest they contact human support.
-Never reveal internal system details or API endpoints.`
-
-type ChatRequest struct {
-	UserID    string `json:"user_id"`
-	SessionID string `json:"session_id,omitempty"`
-	Message   string `json:"message"`
-}
-
-type ChatResponse struct {
-	SessionID string `json:"session_id"`
-	Reply     string `json:"reply"`
-	TokensUsed int   `json:"tokens_used"`
-}
-
-func (uc *AIUsecase) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
-	var session *domain.ChatSession
+	var userData string
 	var err error
 
-	// Get or create session
-	if req.SessionID != "" {
-		session, err = uc.chatRepo.GetSession(ctx, req.SessionID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		title := truncate(req.Message, 64)
-		session, err = uc.chatRepo.CreateSession(ctx, req.UserID, title)
-		if err != nil {
-			return nil, fmt.Errorf("create chat session: %w", err)
-		}
+	// 3. Contextual Data Fetching
+	switch viewContext {
+	case "wallet_view":
+		userData, err = u.repo.GetWalletInsight(ctx, userID)
+	case "rewards_view":
+		userData, err = u.repo.GetRewardsInsight(ctx, userID)
+	case "edtech_view", "quiz_start":
+		userData, err = u.repo.GetEdTechInsight(ctx, userID)
+	default:
+		userData = "User is exploring the app."
 	}
 
-	// Save user message
-	userMsg := &domain.ChatMessage{
-		SessionID: session.ID,
-		Role:      "user",
-		Content:   req.Message,
-	}
-	if _, err := uc.chatRepo.AddMessage(ctx, userMsg); err != nil {
-		return nil, fmt.Errorf("save user message: %w", err)
-	}
-
-	// Get conversation history
-	history, err := uc.chatRepo.GetMessages(ctx, session.ID, 20)
 	if err != nil {
-		return nil, fmt.Errorf("get history: %w", err)
+		log.Printf("[AI Usecase] Warning: Failed to fetch data for %s: %v", viewContext, err)
+		userData = "User data unavailable at the moment."
 	}
 
-	// Call AI provider
-	var historyValues []domain.ChatMessage
-	for _, m := range history {
-		historyValues = append(historyValues, *m)
-	}
-	reply, tokens, err := uc.aiProvider.ChatCompletion(systemPrompt, historyValues)
+	// 4. Strict Persona Injection (Required by System Instructions)
+	persona := `You are Kovi, the friendly, highly intelligent green cobra mascot for the Kovra Super App. Your job is to provide short, helpful, and encouraging insights (max 2 sentences). You must occasionally use emojis like 🐍, ✨, 📈, or 🛡️. Do not use markdown. Speak directly to the user.`
+
+	// 5. Prompt Construction
+	prompt := fmt.Sprintf("%s\n\nCurrent Context: %s\nUser Data: %s\n\nGenerate the insight message:", persona, viewContext, userData)
+
+	// 6. Gemini LLM Generation
+	message, err := u.provider.GenerateContent(ctx, prompt)
 	if err != nil {
-		uc.logger.ErrorContext(ctx, "AI provider failed", slog.String("error", err.Error()))
-		reply = "I'm having trouble connecting right now. Please try again in a moment, or contact our support team for immediate help."
-		tokens = 0
+		log.Printf("[AI Usecase] Error generating content from Gemini: %v", err)
+		// Return safe fallback silently
+		return fallbackMsg, nil
 	}
 
-	// Save assistant reply
-	assistantMsg := &domain.ChatMessage{
-		SessionID:  session.ID,
-		Role:       "assistant",
-		Content:    reply,
-		TokensUsed: tokens,
-	}
-	uc.chatRepo.AddMessage(ctx, assistantMsg)
-
-	return &ChatResponse{
-		SessionID:  session.ID,
-		Reply:      reply,
-		TokensUsed: tokens,
-	}, nil
-}
-
-func (uc *AIUsecase) ListChatSessions(ctx context.Context, userID string) ([]*domain.ChatSession, error) {
-	return uc.chatRepo.ListSessions(ctx, userID)
-}
-
-func (uc *AIUsecase) GetChatHistory(ctx context.Context, sessionID string, limit int) ([]*domain.ChatMessage, error) {
-	return uc.chatRepo.GetMessages(ctx, sessionID, limit)
-}
-
-// ─── Spending Insights ──────────────────────────────────────
-
-func (uc *AIUsecase) GenerateInsights(ctx context.Context, userID string, transactions []domain.TransactionSummary) ([]*domain.SpendingInsight, error) {
-	if len(transactions) < 5 {
-		return nil, domain.ErrNoInsightsYet
+	if message == "" {
+		return fallbackMsg, nil
 	}
 
-	results, err := uc.aiProvider.GenerateInsights(transactions)
-	if err != nil {
-		return nil, fmt.Errorf("generate insights: %w", err)
-	}
-
-	var insights []*domain.SpendingInsight
-	for _, r := range results {
-		insight := &domain.SpendingInsight{
-			UserID:      userID,
-			Period:      "weekly",
-			InsightType: r.Type,
-			Title:       r.Title,
-			Body:        r.Body,
-			Data:        r.Data,
-			GeneratedAt: time.Now(),
-			ExpiresAt:   time.Now().Add(7 * 24 * time.Hour),
-		}
-		if err := uc.insightRepo.Save(ctx, insight); err != nil {
-			uc.logger.ErrorContext(ctx, "save insight failed", slog.String("error", err.Error()))
-			continue
-		}
-		insights = append(insights, insight)
-	}
-
-	return insights, nil
-}
-
-func (uc *AIUsecase) GetInsights(ctx context.Context, userID string, limit int) ([]*domain.SpendingInsight, error) {
-	return uc.insightRepo.ListByUser(ctx, userID, limit)
-}
-
-// ─── Recommendations ────────────────────────────────────────
-
-func (uc *AIUsecase) GenerateRecommendations(ctx context.Context, profile domain.UserProfile) ([]*domain.Recommendation, error) {
-	results, err := uc.aiProvider.GenerateRecommendations(profile)
-	if err != nil {
-		return nil, fmt.Errorf("generate recommendations: %w", err)
-	}
-
-	var recs []*domain.Recommendation
-	for _, r := range results {
-		rec := &domain.Recommendation{
-			UserID:    profile.UserID,
-			RecType:   r.RecType,
-			ItemID:    r.ItemID,
-			Reason:    r.Reason,
-			CreatedAt: time.Now(),
-		}
-		recs = append(recs, rec)
-	}
-
-	if err := uc.recRepo.SaveBatch(ctx, recs); err != nil {
-		return nil, fmt.Errorf("save recommendations: %w", err)
-	}
-
-	return recs, nil
-}
-
-func (uc *AIUsecase) GetRecommendations(ctx context.Context, userID, recType string, limit int) ([]*domain.Recommendation, error) {
-	return uc.recRepo.ListByUser(ctx, userID, recType, limit)
-}
-
-func (uc *AIUsecase) DismissRecommendation(ctx context.Context, recID string) error {
-	return uc.recRepo.Dismiss(ctx, recID)
-}
-
-// ─── Helpers ─────────────────────────────────────────────────
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
+	return message, nil
 }
