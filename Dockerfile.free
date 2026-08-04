@@ -36,6 +36,16 @@ WORKDIR /app/ai-service
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/ai-service ./cmd/server/main.go
 
+# Build Engagement Service
+WORKDIR /app/engagement-service
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/engagement-service ./cmd/server/main.go
+
+# Build Marketplace Service
+WORKDIR /app/marketplace-service
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/marketplace-service ./main.go
+
 # Stage 2: Create a minimal final image
 FROM alpine:3.19
 
@@ -50,6 +60,8 @@ COPY --from=builder /bin/wallet-service ./wallet-service
 COPY --from=builder /bin/notification-service ./notification-service
 COPY --from=builder /bin/vtu-gaming-service ./vtu-gaming-service
 COPY --from=builder /bin/ai-service ./ai-service
+COPY --from=builder /bin/engagement-service ./engagement-service
+COPY --from=builder /bin/marketplace-service ./marketplace-service
 
 # Copy the start script
 COPY start_all.sh ./start_all.sh
