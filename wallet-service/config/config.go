@@ -40,6 +40,9 @@ type DatabaseConfig struct {
 }
 
 func (d DatabaseConfig) DSN() string {
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		return url
+	}
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		d.User, d.Password, d.Host, d.Port, d.DBName, d.SSLMode,

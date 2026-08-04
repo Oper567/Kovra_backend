@@ -34,7 +34,7 @@ func NewGeminiProvider(ctx context.Context, apiKey string, logger *slog.Logger) 
 
 func (p *geminiProvider) ChatCompletion(systemPrompt string, messages []domain.ChatMessage) (string, int, error) {
 	ctx := context.Background()
-	model := p.client.GenerativeModel("gemini-1.5-flash")
+	model := p.client.GenerativeModel("gemini-1.5-flash-latest")
 	model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
 	
 	cs := model.StartChat()
@@ -91,7 +91,7 @@ func (p *geminiProvider) ChatCompletion(systemPrompt string, messages []domain.C
 
 func (p *geminiProvider) GenerateInsights(transactions []domain.TransactionSummary) ([]domain.InsightResult, error) {
 	ctx := context.Background()
-	model := p.client.GenerativeModel("gemini-1.5-flash")
+	model := p.client.GenerativeModel("gemini-1.5-flash-latest")
 	model.ResponseMIMEType = "application/json"
 
 	data, _ := json.Marshal(transactions)
@@ -119,7 +119,7 @@ func (p *geminiProvider) GenerateInsights(transactions []domain.TransactionSumma
 
 func (p *geminiProvider) GenerateRecommendations(profile domain.UserProfile) ([]domain.RecommendationResult, error) {
 	ctx := context.Background()
-	model := p.client.GenerativeModel("gemini-1.5-flash")
+	model := p.client.GenerativeModel("gemini-1.5-flash-latest")
 	model.ResponseMIMEType = "application/json"
 
 	data, _ := json.Marshal(profile)
