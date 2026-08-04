@@ -117,26 +117,32 @@ func (h *OAuthHandler) TokenCallback(c *gin.Context) {
 		return
 	}
 
-	tokenToVerify := req.AccessToken
-	if tokenToVerify == "" {
-		tokenToVerify = req.IDToken
-	}
-
-	if tokenToVerify == "" {
+	if req.AccessToken == "" && req.IDToken == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "access_token or id_token is required"})
 		return
 	}
 
-	// Verify with Google UserInfo API
-	userInfoURL := "https://www.googleapis.com/oauth2/v3/userinfo"
-	client := &http.Client{Timeout: 10 * time.Second}
-	googleReq, err := http.NewRequest("GET", userInfoURL, nil)
+	var verifyURL string
+	var googleReq *http.Request
+	var err error
+
+	if req.IDToken != "" {
+		verifyURL = "https://oauth2.googleapis.com/tokeninfo?id_token=" + req.IDToken
+		googleReq, err = http.NewRequest("GET", verifyURL, nil)
+	} else {
+		verifyURL = "https://www.googleapis.com/oauth2/v3/userinfo"
+		googleReq, err = http.NewRequest("GET", verifyURL, nil)
+		if err == nil {
+			googleReq.Header.Set("Authorization", "Bearer "+req.AccessToken)
+		}
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request"})
 		return
 	}
 
-	googleReq.Header.Set("Authorization", "Bearer "+tokenToVerify)
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(googleReq)
 	if err != nil {
 		h.Logger.Error("failed to fetch user info from google", slog.String("error", err.Error()))

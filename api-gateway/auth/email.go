@@ -342,7 +342,7 @@ func (h *EmailAuthHandler) GetProfile(c *gin.Context) {
 	var email, fullName, avatarURL, role string
 	var isVerified bool
 	err := h.DB.QueryRowContext(c.Request.Context(), `
-		SELECT email, full_name, COALESCE(avatar_url, ''), role, is_verified 
+		SELECT email, COALESCE(full_name, ''), COALESCE(avatar_url, ''), role, is_verified 
 		FROM users WHERE id = $1
 	`, userID).Scan(&email, &fullName, &avatarURL, &role, &isVerified)
 
