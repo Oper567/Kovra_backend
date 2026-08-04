@@ -17,7 +17,7 @@ func NewHandler(uc *usecase.NotificationUsecase) *Handler {
 
 func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	// Private network routing only via API Gateway
-	api := r.Group("/notifications")
+	api := r.Group("/api/v1/notifications")
 	{
 		api.POST("/devices/register", h.registerDevice)
 		api.POST("/admin/push", h.adminPush) // In prod, protect this with an admin API key middleware

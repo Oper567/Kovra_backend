@@ -164,12 +164,12 @@ func main() {
 		auth.Any("/engage/*path", middleware.CircuitBreakerMiddleware(engageCB, "engagement-service"), engageProxy.Forward(""))
 
 		// Notifications (device registration, etc.)
-		auth.Any("/notifications", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward(""))
-		auth.Any("/notifications/*path", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward(""))
+		auth.Any("/notifications", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward("/api/v1"))
+		auth.Any("/notifications/*path", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward("/api/v1"))
 
-		// Rewards (routed to VTU & Gaming Service)
-		auth.Any("/rewards", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
-		auth.Any("/rewards/*path", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
+		// Rewards (routed to Engagement Service)
+		auth.Any("/rewards", middleware.CircuitBreakerMiddleware(engageCB, "engagement-service"), engageProxy.Forward(""))
+		auth.Any("/rewards/*path", middleware.CircuitBreakerMiddleware(engageCB, "engagement-service"), engageProxy.Forward(""))
 
 		// User profile (routed to Engagement Service)
 		auth.Any("/user", middleware.CircuitBreakerMiddleware(engageCB, "engagement-service"), engageProxy.Forward(""))

@@ -80,13 +80,13 @@ func Load() *Config {
 		SMTPPass:     envOr("SMTP_PASS", ""),
 		SMTPFrom:     envOr("SMTP_FROM", "noreply@lucepay.com"),
 
-		WalletServiceURL:       envOr("WALLET_SERVICE_URL", "http://localhost:8081"),
-		VTUServiceURL:          envOr("VTU_SERVICE_URL", "http://localhost:8082"),
-		EcomServiceURL:         envOr("ECOM_SERVICE_URL", "http://localhost:8083"),
-		EdtechServiceURL:       envOr("EDTECH_SERVICE_URL", "http://localhost:8084"),
-		AIServiceURL:           envOr("AI_SERVICE_URL", "http://localhost:8085"),
-		EngagementServiceURL:   envOr("ENGAGEMENT_SERVICE_URL", "http://localhost:8086"),
-		NotificationServiceURL: envOr("NOTIFICATION_SERVICE_URL", "http://localhost:8087"),
+		WalletServiceURL:       envOr("WALLET_SERVICE_URL", "http://127.0.0.1:8081"),
+		VTUServiceURL:          envOr("VTU_SERVICE_URL", "http://127.0.0.1:8082"),
+		EcomServiceURL:         envOr("ECOM_SERVICE_URL", "http://127.0.0.1:8083"),
+		EdtechServiceURL:       envOr("EDTECH_SERVICE_URL", "http://127.0.0.1:8084"),
+		AIServiceURL:           envOr("AI_SERVICE_URL", "http://127.0.0.1:8085"),
+		EngagementServiceURL:   envOr("ENGAGEMENT_SERVICE_URL", "http://127.0.0.1:8086"),
+		NotificationServiceURL: envOr("NOTIFICATION_SERVICE_URL", "http://127.0.0.1:8087"),
 	}
 }
 

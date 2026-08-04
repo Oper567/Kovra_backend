@@ -10,6 +10,8 @@ export WALLET_SERVICE_URL="http://127.0.0.1:8081"
 export VTU_SERVICE_URL="http://127.0.0.1:8082"
 export AI_SERVICE_URL="http://127.0.0.1:8085"
 export NOTIFICATION_SERVICE_URL="http://127.0.0.1:8087"
+export ENGAGEMENT_SERVICE_URL="http://127.0.0.1:8086"
+export DATABASE_URL="postgres://postgres.kcxsqfbepqrcfmrefqlt:MHWDUdklbdFnU4Xw@aws-1-eu-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
 
 # 1. Start Wallet Service
 echo "Starting Wallet Service on port 8081..."
@@ -26,6 +28,10 @@ SERVER_PORT=8082 ./vtu-gaming-service &
 # 4. Start AI Service
 echo "Starting AI Service on port 8085..."
 SERVER_PORT=8085 PORT=8085 ./ai-service &
+
+# 5. Start Engagement Service
+echo "Starting Engagement Service on port 8086..."
+SERVER_PORT=8086 PORT=8086 ./engagement-service &
 
 # Wait a moment for services to bind
 sleep 2

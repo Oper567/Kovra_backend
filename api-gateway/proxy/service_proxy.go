@@ -22,7 +22,7 @@ func NewServiceProxy(targetBase string) *ServiceProxy {
 	return &ServiceProxy{
 		targetBase: strings.TrimRight(targetBase, "/"),
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 90 * time.Second,
 			Transport: &http.Transport{
 				MaxIdleConns:        100,
 				MaxIdleConnsPerHost: 20,
@@ -90,6 +90,7 @@ func (p *ServiceProxy) Forward(stripPrefix string) gin.HandlerFunc {
 				"success": false,
 				"error":   "Downstream service unavailable",
 				"code":    "SERVICE_DOWN",
+				"details": "Failed to reach: " + targetURL.String(),
 			})
 			return
 		}
