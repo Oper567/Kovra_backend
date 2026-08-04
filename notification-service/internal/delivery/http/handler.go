@@ -19,9 +19,18 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	// Private network routing only via API Gateway
 	api := r.Group("/api/v1/notifications")
 	{
+		api.GET("", h.getNotifications)
 		api.POST("/devices/register", h.registerDevice)
 		api.POST("/admin/push", h.adminPush) // In prod, protect this with an admin API key middleware
 	}
+}
+
+func (h *Handler) getNotifications(c *gin.Context) {
+	// Dummy endpoint to prevent 404s until full feature is integrated
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    []interface{}{},
+	})
 }
 
 func (h *Handler) registerDevice(c *gin.Context) {

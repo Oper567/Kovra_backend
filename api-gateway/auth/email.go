@@ -321,6 +321,87 @@ func (h *EmailAuthHandler) Login(c *gin.Context) {
 	})
 }
 
+// GetProfile fetches the user's profile information.
+func (h *EmailAuthHandler) GetProfile(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var email, fullName, avatarURL, role string
+	var isVerified bool
+	err := h.DB.QueryRowContext(c.Request.Context(), `
+		SELECT email, full_name, COALESCE(avatar_url, ''), role, is_verified 
+		FROM users WHERE id = $1
+	`, userID).Scan(&email, &fullName, &avatarURL, &role, &isVerified)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	} else if err != nil {
+		h.Logger.Error("failed to get user profile", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"user": gin.H{
+			"id":          userID,
+			"email":       email,
+			"name":        fullName,
+			"avatar_url":  avatarURL,
+			"role":        role,
+			"is_verified": isVerified,
+		},
+	})
+}
+
+// UpdateProfileRequest represents the payload for updating a user profile.
+type UpdateProfileRequest struct {
+	FullName  *string `json:"full_name"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+// UpdateProfile updates the user's profile information.
+func (h *EmailAuthHandler) UpdateProfile(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	if req.FullName != nil {
+		_, err := h.DB.ExecContext(c.Request.Context(), "UPDATE users SET full_name = $1, updated_at = NOW() WHERE id = $2", *req.FullName, userID)
+		if err != nil {
+			h.Logger.Error("failed to update user full_name", slog.String("error", err.Error()))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update full name"})
+			return
+		}
+	}
+
+	if req.AvatarURL != nil {
+		_, err := h.DB.ExecContext(c.Request.Context(), "UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2", *req.AvatarURL, userID)
+		if err != nil {
+			h.Logger.Error("failed to update user avatar", slog.String("error", err.Error()))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update avatar"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Profile updated successfully",
+	})
+}
+
 func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email string) error {
 	// Generate 6-digit code
 	codeInt, err := rand.Int(rand.Reader, big.NewInt(900000))
