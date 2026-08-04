@@ -54,18 +54,25 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 		CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 		CREATE TABLE IF NOT EXISTS users (
 			id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			email         VARCHAR(255) NOT NULL UNIQUE,
-			password_hash VARCHAR(255),
-			full_name     VARCHAR(255),
-			avatar_url    TEXT,
-			is_verified   BOOLEAN NOT NULL DEFAULT FALSE,
-			provider      VARCHAR(50) DEFAULT 'email',
-			provider_id   VARCHAR(255),
-			role          VARCHAR(50) NOT NULL DEFAULT 'user',
-			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			CONSTRAINT unique_provider_id UNIQUE (provider, provider_id)
+			email         VARCHAR(255) NOT NULL UNIQUE
 		);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS provider VARCHAR(50) DEFAULT 'email';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_id VARCHAR(255);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_provider_id') THEN
+				ALTER TABLE users ADD CONSTRAINT unique_provider_id UNIQUE (provider, provider_id);
+			END IF;
+		END $$;
+
 		ALTER TABLE users ALTER COLUMN provider SET DEFAULT 'email';
 		ALTER TABLE users ALTER COLUMN provider_id DROP NOT NULL;
 		ALTER TABLE users ALTER COLUMN provider_id SET DEFAULT '';
