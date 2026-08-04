@@ -62,12 +62,12 @@ func Load() *Config {
 		WriteTimeout:    envDurOr("WRITE_TIMEOUT", 10*time.Second),
 		ShutdownTimeout: envDurOr("SHUTDOWN_TIMEOUT", 15*time.Second),
 
-		DBHost:     envOr("DB_HOST", "localhost"),
+		DBHost:     envOr("DB_HOST", "aws-1-eu-west-2.pooler.supabase.com"),
 		DBPort:     envOr("DB_PORT", "5432"),
-		DBUser:     envOr("DB_USER", "lucepay"),
-		DBPassword: envOr("DB_PASSWORD", "lucepay_secret_2024"),
-		DBName:     envOr("DB_NAME", "lucepay_users"),
-		DBSSLMode:  envOr("DB_SSLMODE", "disable"),
+		DBUser:     envOr("DB_USER", "postgres.kcxsqfbepqrcfmrefqlt"),
+		DBPassword: envOr("DB_PASSWORD", "MHWDUdklbdFnU4Xw"),
+		DBName:     envOr("DB_NAME", "postgres"),
+		DBSSLMode:  envOr("DB_SSLMODE", "require"),
 
 		GoogleClientID:     envOr("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: envOr("GOOGLE_CLIENT_SECRET", ""),

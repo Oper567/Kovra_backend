@@ -137,8 +137,8 @@ func main() {
 		pub.POST("/paystack-webhook", middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
 
 		// Public product catalog
-		pub.Any("/shop/products", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
-		pub.Any("/shop/products/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
+		pub.Any("/marketplace/products", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
+		pub.Any("/marketplace/products/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
 	}
 
 	// ─── Authenticated Routes ───────────────────────────────
@@ -154,11 +154,9 @@ func main() {
 		auth.Any("/vtu", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
 		auth.Any("/vtu/*path", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
 
-		// E-Commerce (authenticated actions: cart, orders)
-		auth.Any("/shop/cart", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
-		auth.Any("/shop/cart/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
-		auth.Any("/shop/orders", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
-		auth.Any("/shop/orders/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
+		// Marketplace (authenticated actions: create product, merchant profile)
+		auth.Any("/marketplace", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
+		auth.Any("/marketplace/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
 
 		// EdTech
 		auth.Any("/learn", middleware.CircuitBreakerMiddleware(edtechCB, "edtech-service"), edtechProxy.Forward(""))
