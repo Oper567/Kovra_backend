@@ -57,7 +57,7 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 			email         VARCHAR(255) NOT NULL UNIQUE
 		);
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
-		ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(255) UNIQUE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;
@@ -99,7 +99,7 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
-	FullName string `json:"name" binding:"required"`
+	Name     string `json:"name" binding:"required"`
 	Username string `json:"username" binding:"required"`
 }
 
@@ -134,7 +134,7 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 			return
 		}
 		
-		_, err = h.DB.ExecContext(c.Request.Context(), "UPDATE users SET password_hash = $1, full_name = $2, username = $3 WHERE id = $4", string(hashedPassword), req.FullName, req.Username, existingID)
+		_, err = h.DB.ExecContext(c.Request.Context(), "UPDATE users SET password_hash = $1, name = $2, username = $3 WHERE id = $4", string(hashedPassword), req.Name, req.Username, existingID)
 		if err != nil {
 			h.Logger.Error("failed to update unverified user", slog.String("error", err.Error()))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -152,19 +152,19 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 		// Insert into DB as unverified
 		var userID string
 		err = h.DB.QueryRowContext(c.Request.Context(), `
-			INSERT INTO users (email, password_hash, full_name, username, is_verified, provider, provider_id)
+			INSERT INTO users (email, password_hash, name, username, is_verified, provider, provider_id)
 			VALUES ($1, $2, $3, $4, false, 'email', NULL)
 			RETURNING id
-		`, req.Email, string(hashedPassword), req.FullName, req.Username).Scan(&userID)
+		`, req.Email, string(hashedPassword), req.Name, req.Username).Scan(&userID)
 		
 		if err != nil {
 			h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
 			genID := generateUUID()
 			err = h.DB.QueryRowContext(c.Request.Context(), `
-				INSERT INTO users (id, email, password_hash, full_name, username, is_verified, provider, provider_id)
+				INSERT INTO users (id, email, password_hash, name, username, is_verified, provider, provider_id)
 				VALUES ($1, $2, $3, $4, $5, false, 'email', NULL)
 				RETURNING id
-			`, genID, req.Email, string(hashedPassword), req.FullName, req.Username).Scan(&userID)
+			`, genID, req.Email, string(hashedPassword), req.Name, req.Username).Scan(&userID)
 		}
 
 		if err != nil {
@@ -229,10 +229,10 @@ func (h *EmailAuthHandler) Verify(c *gin.Context) {
 	}
 
 	// Update user in DB
-	var userID, role, fullName string
+	var userID, role, name string
 	err = h.DB.QueryRowContext(c.Request.Context(), `
-		UPDATE users SET is_verified = true WHERE email = $1 RETURNING id, role, full_name
-	`, req.Email).Scan(&userID, &role, &fullName)
+		UPDATE users SET is_verified = true WHERE email = $1 RETURNING id, role, name
+	`, req.Email).Scan(&userID, &role, &name)
 	if err != nil {
 		h.Logger.Error("failed to update user verification status", slog.String("error", err.Error()))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user"})
@@ -243,7 +243,7 @@ func (h *EmailAuthHandler) Verify(c *gin.Context) {
 	h.RDB.Del(c.Request.Context(), redisKey)
 
 	// Issue JWT
-	token, err := generateJWT(userID, req.Email, fullName, role, h.Config)
+	token, err := generateJWT(userID, req.Email, name, role, h.Config)
 	if err != nil {
 		h.Logger.Error("failed to generate jwt", slog.String("error", err.Error()))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
@@ -257,7 +257,7 @@ func (h *EmailAuthHandler) Verify(c *gin.Context) {
 		"user": gin.H{
 			"id":    userID,
 			"email": req.Email,
-			"name":  fullName,
+			"name":  name,
 			"role":  role,
 		},
 	})
@@ -280,12 +280,12 @@ func (h *EmailAuthHandler) Login(c *gin.Context) {
 	// Normalize email
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
-	var userID, passwordHash, fullName, role string
+	var userID, passwordHash, name, role string
 	var isVerified bool
 	err := h.DB.QueryRowContext(c.Request.Context(), `
-		SELECT id, password_hash, full_name, role, is_verified 
+		SELECT id, password_hash, name, role, is_verified 
 		FROM users WHERE email = $1 AND (provider IS NULL OR provider = 'email' OR provider = 'local')
-	`, req.Email).Scan(&userID, &passwordHash, &fullName, &role, &isVerified)
+	`, req.Email).Scan(&userID, &passwordHash, &name, &role, &isVerified)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
@@ -312,7 +312,7 @@ func (h *EmailAuthHandler) Login(c *gin.Context) {
 	}
 
 	// Issue JWT
-	token, err := generateJWT(userID, req.Email, fullName, role, h.Config)
+	token, err := generateJWT(userID, req.Email, name, role, h.Config)
 	if err != nil {
 		h.Logger.Error("failed to generate jwt", slog.String("error", err.Error()))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
@@ -325,7 +325,7 @@ func (h *EmailAuthHandler) Login(c *gin.Context) {
 		"user": gin.H{
 			"id":    userID,
 			"email": req.Email,
-			"name":  fullName,
+			"name":  name,
 			"role":  role,
 		},
 	})

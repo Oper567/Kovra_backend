@@ -62,10 +62,10 @@ func (h *OAuthHandler) Callback(c *gin.Context) {
 	var role string
 
 	err = h.DB.QueryRowContext(c.Request.Context(), `
-		INSERT INTO users (email, full_name, avatar_url, provider, provider_id)
+		INSERT INTO users (email, name, avatar_url, provider, provider_id)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (email) DO UPDATE SET 
-			full_name = EXCLUDED.full_name,
+			name = EXCLUDED.name,
 			avatar_url = EXCLUDED.avatar_url,
 			updated_at = NOW()
 		RETURNING id, role
@@ -170,10 +170,10 @@ func (h *OAuthHandler) TokenCallback(c *gin.Context) {
 	var role string
 
 	err = h.DB.QueryRowContext(c.Request.Context(), `
-		INSERT INTO users (email, full_name, avatar_url, provider, provider_id)
+		INSERT INTO users (email, name, avatar_url, provider, provider_id)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (email) DO UPDATE SET 
-			full_name = EXCLUDED.full_name,
+			name = EXCLUDED.name,
 			avatar_url = EXCLUDED.avatar_url,
 			updated_at = NOW()
 		RETURNING id, role
