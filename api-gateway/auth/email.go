@@ -91,7 +91,7 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
-	FullName string `json:"full_name" binding:"required"`
+	FullName string `json:"name" binding:"required"`
 }
 
 // Register handles user signup.

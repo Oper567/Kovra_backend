@@ -73,12 +73,12 @@ func (h *AIHandler) GetInsight(c *gin.Context) {
 	})
 }
 
-// authMiddleware is a placeholder for the actual JWT middleware implementation
-// which extracts the user ID from the Bearer token and sets it in the Gin context.
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Mock implementation for structural correctness
-		// c.Set("userID", "extracted_user_id_from_jwt")
+		userID := c.GetHeader("X-User-ID")
+		if userID != "" {
+			c.Set("userID", userID)
+		}
 		c.Next()
 	}
 }

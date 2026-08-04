@@ -33,8 +33,12 @@ SERVER_PORT=8085 PORT=8085 ./ai-service &
 echo "Starting Engagement Service on port 8086..."
 SERVER_PORT=8086 PORT=8086 ./engagement-service &
 
+# 6. Start Marketplace Service
+echo "Starting Marketplace Service on port 8083..."
+SERVER_PORT=8083 PORT=8083 ./marketplace-service &
+
 # Wait a moment for services to bind
-sleep 2
+sleep 5
 
 # 5. Start API Gateway (Runs in foreground to keep container alive)
 echo "Starting API Gateway on port $GATEWAY_PORT..."
