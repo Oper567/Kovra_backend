@@ -166,6 +166,14 @@ func main() {
 		// Notifications (device registration, etc.)
 		auth.Any("/notifications", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward(""))
 		auth.Any("/notifications/*path", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward(""))
+
+		// Rewards (routed to VTU & Gaming Service)
+		auth.Any("/rewards", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
+		auth.Any("/rewards/*path", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
+
+		// User profile (routed to Engagement Service)
+		auth.Any("/user", middleware.CircuitBreakerMiddleware(engageCB, "engagement-service"), engageProxy.Forward(""))
+		auth.Any("/user/*path", middleware.CircuitBreakerMiddleware(engageCB, "engagement-service"), engageProxy.Forward(""))
 	}
 
 	// ─── Marketplace Routes (Mixed Auth) ────────────────────
