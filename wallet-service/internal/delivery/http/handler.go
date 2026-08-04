@@ -124,6 +124,9 @@ func (h *WalletHandler) GetBalance(c *gin.Context) {
 		userID = c.GetString("user_id")
 	}
 	if userID == "" {
+		userID = c.GetHeader("X-User-ID")
+	}
+	if userID == "" {
 		c.JSON(http.StatusBadRequest, APIResponse{
 			Success: false,
 			Error:   "user_id is required",
@@ -269,6 +272,9 @@ func (h *WalletHandler) GetTransactions(c *gin.Context) {
 	userID := c.Query("user_id")
 	if userID == "" {
 		userID = c.GetString("user_id")
+	}
+	if userID == "" {
+		userID = c.GetHeader("X-User-ID")
 	}
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, APIResponse{
