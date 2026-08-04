@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -135,10 +136,6 @@ func main() {
 
 		// Public Wallet Webhooks (Paystack)
 		pub.POST("/paystack-webhook", middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
-
-		// Public product catalog
-		pub.Any("/marketplace/products", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
-		pub.Any("/marketplace/products/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
 	}
 
 	// ─── Authenticated Routes ───────────────────────────────
@@ -153,10 +150,6 @@ func main() {
 		// VTU & Gaming
 		auth.Any("/vtu", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
 		auth.Any("/vtu/*path", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
-
-		// Marketplace (authenticated actions: create product, merchant profile)
-		auth.Any("/marketplace", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
-		auth.Any("/marketplace/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
 
 		// EdTech
 		auth.Any("/learn", middleware.CircuitBreakerMiddleware(edtechCB, "edtech-service"), edtechProxy.Forward(""))
@@ -174,6 +167,19 @@ func main() {
 		auth.Any("/notifications", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward(""))
 		auth.Any("/notifications/*path", middleware.CircuitBreakerMiddleware(notifCB, "notification-service"), notifProxy.Forward(""))
 	}
+
+	// ─── Marketplace Routes (Mixed Auth) ────────────────────
+	market := r.Group("/api/v1/marketplace")
+	market.Use(rateLimiter.Limit())
+	market.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/marketplace/products") {
+			middleware.OptionalJWTAuth(cfg.JWTSecret, cfg.JWTIssuer)(c)
+		} else {
+			middleware.JWTAuth(cfg.JWTSecret, cfg.JWTIssuer)(c)
+		}
+	})
+	market.Any("", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
+	market.Any("/*path", middleware.CircuitBreakerMiddleware(ecomCB, "ecom-service"), ecomProxy.Forward(""))
 
 	// ─── Start Server ───────────────────────────────────────
 	srv := &http.Server{
