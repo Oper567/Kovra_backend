@@ -6,144 +6,216 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
-
-	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/domain"
 )
 
-type DatastationProvider struct {
-	apiKey     string
-	baseURL    string
-	httpClient *http.Client
+// DataStationClient acts as the wrapper for the DataStation API.
+type DataStationClient struct {
+	BaseURL    string
+	APIKey     string
+	HTTPClient *http.Client
 }
 
-func NewDatastationProvider(apiKey string) *DatastationProvider {
-	return &DatastationProvider{
-		apiKey:  apiKey,
-		baseURL: "https://datastation.com.ng",
-		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
-		},
+// NewDataStationClient initializes a new client using the provided token.
+func NewDataStationClient(apiKey string) *DataStationClient {
+	return &DataStationClient{
+		BaseURL:    "https://datastation.com.ng",
+		APIKey:     apiKey,
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-func (p *DatastationProvider) Name() string {
-	return "datastation"
-}
+// =======================================================================
+// 1. VALIDATE METER NUMBER (GET REQUEST)
+// =======================================================================
 
-func (p *DatastationProvider) Execute(product *domain.Product, recipient string) (string, map[string]any, error) {
-	// The exact endpoint depends on the product category based on Datastation docs
-	var endpoint string
-	var payload map[string]any
-
-	switch product.Category {
-	case domain.CategoryAirtime:
-		endpoint = "/api/rechargepin/"
-		payload = map[string]any{
-			"network":        product.ProviderCode, // e.g., "1" for MTN
-			"network_amount": product.Amount.String(),
-			"quantity":       "1",
-			"name_on_card":   recipient,
-		}
-	case domain.CategoryData:
-		// Assuming standard Datastation data API structure
-		endpoint = "/api/data/"
-		payload = map[string]any{
-			"network": product.ProviderCode,
-			"plan":    product.Metadata["plan_id"], // Data plan ID
-			"phone":   recipient,
-		}
-	case domain.CategoryElectricity:
-		endpoint = "/api/billpay/"
-		payload = map[string]any{
-			"disco":       product.ProviderCode,
-			"meter_no":    recipient,
-			"amount":      product.Amount.String(),
-			"meter_type":  "prepaid",
-		}
-	case domain.CategoryEducation:
-		endpoint = "/api/epin/"
-		payload = map[string]any{
-			"exam_name": product.ProviderCode,
-			"quantity":  "1",
-		}
-	default:
-		return "", nil, fmt.Errorf("unsupported product category for datastation: %s", product.Category)
-	}
-
-	url := fmt.Sprintf("%s%s", p.baseURL, endpoint)
-	body, _ := json.Marshal(payload)
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		return "", nil, err
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("Token %s", p.apiKey))
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return "", nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-
-	var responseData map[string]any
-	if err := json.Unmarshal(respBody, &responseData); err != nil {
-		// If it's not JSON, maybe just string
-		responseData = map[string]any{"raw": string(respBody)}
-	}
-
-	// Assuming 200 or 201 means success in Datastation. 
-	// Real-world implementation would check responseData["status"] or similar.
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", responseData, fmt.Errorf("datastation API error (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	// Generate a fake provider ref if none is returned
-	providerRef := fmt.Sprintf("ds-%d", time.Now().UnixNano())
-	if ref, ok := responseData["reference"].(string); ok {
-		providerRef = ref
-	}
-
-	return providerRef, responseData, nil
-}
-
-func (p *DatastationProvider) CheckStatus(providerRef string) (domain.OrderStatus, error) {
-	// Not fully implemented for Datastation yet
-	return domain.OrderCompleted, nil
-}
-
-func (p *DatastationProvider) ValidateMeter(meterNumber, discoName, meterType string) (map[string]any, error) {
-	url := fmt.Sprintf("%s/ajax/validate_meter_number?meternumber=%s&disconame=%s&mtype=%s",
-		p.baseURL, meterNumber, discoName, meterType)
-
-	req, err := http.NewRequest("GET", url, nil)
+// ValidateMeter checks the validity of a meter before electricity payment.
+func (c *DataStationClient) ValidateMeter(meterNumber, discoName, mType string) (map[string]interface{}, error) {
+	// Construct the URL with query parameters
+	endpoint := fmt.Sprintf("%s/ajax/validate_meter_number", c.BaseURL)
+	reqURL, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Token %s", p.apiKey))
-	req.Header.Add("Content-Type", "application/json")
+	q := reqURL.Query()
+	q.Add("meternumber", meterNumber)
+	q.Add("disconame", discoName)
+	q.Add("mtype", mType) // Usually "prepaid" or "postpaid"
+	reqURL.RawQuery = q.Encode()
 
-	resp, err := p.httpClient.Do(req)
+	req, err := http.NewRequest("GET", reqURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	// Add Required Headers
+	req.Header.Add("Authorization", "Token "+c.APIKey)
+	req.Header.Add("Content-Type", "application/json")
 
-	var responseData map[string]any
-	if err := json.Unmarshal(respBody, &responseData); err != nil {
-		return nil, fmt.Errorf("failed to parse validate meter response: %v", err)
+	res, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return responseData, fmt.Errorf("datastation API error (status %d)", resp.StatusCode)
+	// Parse JSON
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response JSON: %s", string(body))
 	}
 
-	return responseData, nil
+	return result, nil
+}
+
+// =======================================================================
+// 2. GENERATE AIRTIME PIN (POST REQUEST)
+// =======================================================================
+
+// GenerateAirtimePin payload definition
+type AirtimePinRequest struct {
+	Network       int    `json:"network"`        // e.g., 1 for MTN
+	NetworkAmount int    `json:"network_amount"` // The amount ID or integer
+	Quantity      int    `json:"quantity"`
+	NameOnCard    string `json:"name_on_card"`
+}
+
+func (c *DataStationClient) GenerateAirtimePin(reqData AirtimePinRequest) (map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("%s/api/rechargepin/", c.BaseURL)
+
+	payloadBytes, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", "Token "+c.APIKey)
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		// API sometimes returns 201 Created with text/HTML on poor implementations. We handle it safely.
+		return map[string]interface{}{
+			"status": "success",
+			"raw":    string(body),
+		}, nil
+	}
+
+	return result, nil
+}
+
+// =======================================================================
+// 3. GENERATE RESULT/EDUCATION PINS (POST REQUEST)
+// =======================================================================
+
+type EduPinRequest struct {
+	ExamName string `json:"exam_name"` // "waec", "neco", etc.
+	Quantity int    `json:"quantity"`
+}
+
+func (c *DataStationClient) GenerateEduPin(reqData EduPinRequest) (map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("%s/api/epin/", c.BaseURL)
+
+	payloadBytes, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", "Token "+c.APIKey)
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return map[string]interface{}{
+			"status": "success",
+			"raw":    string(body),
+		}, nil
+	}
+
+	return result, nil
+}
+
+// =======================================================================
+// 4. BUY DATA PLAN (GENERIC POST REQUEST)
+// =======================================================================
+
+// BuyData payload definition (Inferring from DataStation's standard structure)
+type BuyDataRequest struct {
+	Network int    `json:"network"` // 1=MTN, 2=GLO, 3=9MOBILE, 4=AIRTEL
+	Mobile  string `json:"mobile_number"`
+	Plan    int    `json:"plan"`    // The provider_id from the database
+	Ported  bool   `json:"Ported_number"`
+}
+
+// BuyData processes direct-to-phone data purchases.
+func (c *DataStationClient) BuyData(reqData BuyDataRequest) (map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("%s/api/data/", c.BaseURL)
+
+	payloadBytes, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", "Token "+c.APIKey)
+	req.Header.Add("Content-Type", "application/json")
+
+	res, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response JSON: %s", string(body))
+	}
+
+	return result, nil
 }

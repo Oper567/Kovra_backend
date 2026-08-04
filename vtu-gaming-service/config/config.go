@@ -19,7 +19,7 @@ func Load() *Config {
 		Port:              envOrDefault("SERVER_PORT", "8082"),
 		DatabaseURL:       envOrDefault("DATABASE_URL", "postgres://lucepay:lucepay_secret_2024@localhost:5432/lucepay_wallet?sslmode=disable"),
 		WalletServiceURL:  envOrDefault("WALLET_SERVICE_URL", "http://localhost:8081"),
-		DatastationAPIKey: envOrDefault("DATASTATION_API_KEY", ""), // Passed via Render Env
+		DatastationAPIKey: envOrDefault("DATASTATION_API_KEY", "361ddcb02d9b6f1e81bc6cac7f880ed0665a6ffc"), // Passed via Render Env
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 	}
