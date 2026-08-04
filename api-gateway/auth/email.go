@@ -58,6 +58,7 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 		);
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(255) UNIQUE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS provider VARCHAR(50) DEFAULT 'email';
@@ -99,6 +100,7 @@ type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
 	FullName string `json:"name" binding:"required"`
+	Username string `json:"username" binding:"required"`
 }
 
 // Register handles user signup.
@@ -109,17 +111,18 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Normalize email
+	// Normalize email and username
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 
 	// Check if user exists
 	var existingID string
 	var isVerified bool
-	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT id, is_verified FROM users WHERE LOWER(email) = $1", req.Email).Scan(&existingID, &isVerified)
+	err := h.DB.QueryRowContext(c.Request.Context(), "SELECT id, is_verified FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $2", req.Email, req.Username).Scan(&existingID, &isVerified)
 	
 	if err == nil {
 		if isVerified {
-			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Email or username already registered"})
 			return
 		}
 		
@@ -131,7 +134,7 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 			return
 		}
 		
-		_, err = h.DB.ExecContext(c.Request.Context(), "UPDATE users SET password_hash = $1, full_name = $2 WHERE id = $3", string(hashedPassword), req.FullName, existingID)
+		_, err = h.DB.ExecContext(c.Request.Context(), "UPDATE users SET password_hash = $1, full_name = $2, username = $3 WHERE id = $4", string(hashedPassword), req.FullName, req.Username, existingID)
 		if err != nil {
 			h.Logger.Error("failed to update unverified user", slog.String("error", err.Error()))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -149,19 +152,19 @@ func (h *EmailAuthHandler) Register(c *gin.Context) {
 		// Insert into DB as unverified
 		var userID string
 		err = h.DB.QueryRowContext(c.Request.Context(), `
-			INSERT INTO users (email, password_hash, full_name, is_verified, provider, provider_id)
-			VALUES ($1, $2, $3, false, 'email', NULL)
+			INSERT INTO users (email, password_hash, full_name, username, is_verified, provider, provider_id)
+			VALUES ($1, $2, $3, $4, false, 'email', NULL)
 			RETURNING id
-		`, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
+		`, req.Email, string(hashedPassword), req.FullName, req.Username).Scan(&userID)
 		
 		if err != nil {
 			h.Logger.Warn("default insert user failed, retrying with explicit UUID", slog.String("error", err.Error()))
 			genID := generateUUID()
 			err = h.DB.QueryRowContext(c.Request.Context(), `
-				INSERT INTO users (id, email, password_hash, full_name, is_verified, provider, provider_id)
-				VALUES ($1, $2, $3, $4, false, 'email', NULL)
+				INSERT INTO users (id, email, password_hash, full_name, username, is_verified, provider, provider_id)
+				VALUES ($1, $2, $3, $4, $5, false, 'email', NULL)
 				RETURNING id
-			`, genID, req.Email, string(hashedPassword), req.FullName).Scan(&userID)
+			`, genID, req.Email, string(hashedPassword), req.FullName, req.Username).Scan(&userID)
 		}
 
 		if err != nil {
