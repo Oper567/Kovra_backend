@@ -152,8 +152,8 @@ func main() {
 		auth.Any("/vtu/*path", middleware.CircuitBreakerMiddleware(vtuCB, "vtu-service"), vtuProxy.Forward(""))
 
 		// EdTech
-		auth.Any("/learn", middleware.CircuitBreakerMiddleware(edtechCB, "edtech-service"), edtechProxy.Forward(""))
-		auth.Any("/learn/*path", middleware.CircuitBreakerMiddleware(edtechCB, "edtech-service"), edtechProxy.Forward(""))
+		auth.Any("/edtech", middleware.CircuitBreakerMiddleware(edtechCB, "edtech-service"), edtechProxy.Forward(""))
+		auth.Any("/edtech/*path", middleware.CircuitBreakerMiddleware(edtechCB, "edtech-service"), edtechProxy.Forward(""))
 
 		// AI Features
 		auth.Any("/ai", middleware.CircuitBreakerMiddleware(aiCB, "ai-service"), aiProxy.Forward(""))

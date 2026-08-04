@@ -36,6 +36,7 @@ func (h *WalletHandler) RegisterRoutes(r *gin.RouterGroup) {
 		wallet.POST("", h.CreateWallet)
 		wallet.GET("/balance", h.GetBalance)
 		wallet.POST("/credit", h.CreditWallet)
+		wallet.POST("/transfer", h.TransferWallet)
 		wallet.GET("/transactions", h.GetTransactions)
 		wallet.POST("/fund/initialize", h.FundInitialize)
 	}
@@ -187,6 +188,70 @@ func (h *WalletHandler) CreditWallet(c *gin.Context) {
 			"transaction_id": result.Transaction.ID,
 			"new_balance":    result.NewBalance.StringFixed(4),
 			"status":         result.Transaction.Status,
+		},
+	})
+}
+
+type TransferWalletRequest struct {
+	ReceiverID     string          `json:"receiver_id" binding:"required,uuid"`
+	Amount         decimal.Decimal `json:"amount" binding:"required"`
+	Description    string          `json:"description"`
+	IdempotencyKey string          `json:"idempotency_key" binding:"required"`
+	Metadata       map[string]any  `json:"metadata"`
+}
+
+// TransferWallet godoc
+// @Summary Transfer funds to another user
+// @Tags wallet
+// @Accept json
+// @Produce json
+// @Param body body TransferWalletRequest true "Transfer Wallet"
+// @Success 200 {object} APIResponse
+// @Router /wallet/transfer [post]
+func (h *WalletHandler) TransferWallet(c *gin.Context) {
+	senderID := c.GetString("user_id")
+	if senderID == "" {
+		// Fallback for testing if not set by middleware
+		senderID = c.GetHeader("X-User-ID")
+	}
+	if senderID == "" {
+		c.JSON(http.StatusUnauthorized, APIResponse{
+			Success: false,
+			Error:   "Unauthorized",
+			Code:    "UNAUTHORIZED",
+		})
+		return
+	}
+
+	var req TransferWalletRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Success: false,
+			Error:   "Invalid request body: " + err.Error(),
+			Code:    "VALIDATION_ERROR",
+		})
+		return
+	}
+
+	result, err := h.uc.TransferWallet(c.Request.Context(), usecase.TransferRequest{
+		SenderID:       senderID,
+		ReceiverID:     req.ReceiverID,
+		Amount:         req.Amount,
+		Description:    req.Description,
+		IdempotencyKey: req.IdempotencyKey,
+		Metadata:       req.Metadata,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, APIResponse{
+		Success: true,
+		Data: gin.H{
+			"transaction_id": result.TransactionID,
+			"new_balance":    result.NewBalance.StringFixed(4),
+			"status":         "COMPLETED",
 		},
 	})
 }

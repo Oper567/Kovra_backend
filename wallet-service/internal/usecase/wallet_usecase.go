@@ -156,6 +156,142 @@ func (uc *WalletUsecase) CreditWallet(ctx context.Context, req CreditRequest) (*
 	return response, nil
 }
 
+// ─── Transfer Wallet ─────────────────────────────────────────
+
+type TransferRequest struct {
+	SenderID       string
+	ReceiverID     string
+	Amount         decimal.Decimal
+	Description    string
+	IdempotencyKey string
+	Metadata       map[string]any
+}
+
+type TransferResponse struct {
+	TransactionID string
+	NewBalance    decimal.Decimal
+}
+
+func (uc *WalletUsecase) TransferWallet(ctx context.Context, req TransferRequest) (*TransferResponse, error) {
+	if !req.Amount.IsPositive() {
+		return nil, domain.ErrInvalidAmount
+	}
+	if req.SenderID == req.ReceiverID {
+		return nil, fmt.Errorf("cannot transfer to self")
+	}
+
+	// Check idempotency first
+	existing, err := uc.txnRepo.GetByIdempotencyKey(ctx, req.IdempotencyKey)
+	if err != nil {
+		return nil, fmt.Errorf("idempotency check: %w", err)
+	}
+	if existing != nil {
+		uc.logger.InfoContext(ctx, "idempotent transfer request, returning existing",
+			slog.String("idempotency_key", req.IdempotencyKey),
+		)
+		wallet, _ := uc.walletRepo.GetByUserID(ctx, req.SenderID)
+		return &TransferResponse{TransactionID: existing.ID, NewBalance: wallet.Balance}, nil
+	}
+
+	var response *TransferResponse
+
+	err = uc.uow.Execute(ctx, func(txCtx context.Context) error {
+		// Get sender wallet
+		senderWallet, err := uc.walletRepo.GetByUserID(txCtx, req.SenderID)
+		if err != nil {
+			return err
+		}
+		if senderWallet.IsLocked {
+			return domain.ErrWalletLocked
+		}
+		if !senderWallet.HasSufficientBalance(req.Amount) {
+			return domain.ErrInsufficientBalance
+		}
+
+		// Get receiver wallet
+		receiverWallet, err := uc.walletRepo.GetByUserID(txCtx, req.ReceiverID)
+		if err != nil {
+			return err
+		}
+		if receiverWallet.IsLocked {
+			return domain.ErrWalletLocked
+		}
+
+		senderNewBalance := senderWallet.Balance.Sub(req.Amount)
+		receiverNewBalance := receiverWallet.Balance.Add(req.Amount)
+
+		desc := req.Description
+		if desc == "" {
+			desc = "Wallet Transfer"
+		}
+
+		// 1. Create Debit Transaction for Sender
+		senderTxn := &domain.Transaction{
+			WalletID:       senderWallet.ID,
+			Type:           domain.TransactionTypeDebit,
+			Status:         domain.TransactionStatusCompleted,
+			Channel:        domain.TransactionChannel("TRANSFER"),
+			Amount:         req.Amount,
+			BalanceBefore:  senderWallet.Balance,
+			BalanceAfter:   senderNewBalance,
+			IdempotencyKey: req.IdempotencyKey,
+			Description:    strPtr(desc),
+			Metadata:       req.Metadata,
+		}
+		createdSenderTxn, err := uc.txnRepo.Create(txCtx, senderTxn)
+		if err != nil {
+			return err
+		}
+
+		// 2. Create Credit Transaction for Receiver
+		receiverTxn := &domain.Transaction{
+			WalletID:       receiverWallet.ID,
+			Type:           domain.TransactionTypeCredit,
+			Status:         domain.TransactionStatusCompleted,
+			Channel:        domain.TransactionChannel("TRANSFER"),
+			Amount:         req.Amount,
+			BalanceBefore:  receiverWallet.Balance,
+			BalanceAfter:   receiverNewBalance,
+			ReferenceID:    strPtr(createdSenderTxn.ID),
+			IdempotencyKey: fmt.Sprintf("%s-credit", req.IdempotencyKey),
+			Description:    strPtr(desc),
+			Metadata:       req.Metadata,
+		}
+		if _, err := uc.txnRepo.Create(txCtx, receiverTxn); err != nil {
+			return err
+		}
+
+		// 3. Update Sender Balance
+		updatedSenderWallet, err := uc.walletRepo.UpdateBalance(txCtx, senderWallet.ID, senderNewBalance, senderWallet.Version)
+		if err != nil {
+			return err
+		}
+
+		// 4. Update Receiver Balance
+		if _, err := uc.walletRepo.UpdateBalance(txCtx, receiverWallet.ID, receiverNewBalance, receiverWallet.Version); err != nil {
+			return err
+		}
+
+		response = &TransferResponse{
+			TransactionID: createdSenderTxn.ID,
+			NewBalance:    updatedSenderWallet.Balance,
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	uc.logger.InfoContext(ctx, "wallet transfer completed",
+		slog.String("sender_id", req.SenderID),
+		slog.String("receiver_id", req.ReceiverID),
+		slog.String("amount", req.Amount.String()),
+	)
+
+	return response, nil
+}
+
 // ─── Debit for Saga ──────────────────────────────────────────
 // This is called by other services (VTU, E-Comm) via gRPC.
 // It creates a debit transaction AND a saga compensation record
