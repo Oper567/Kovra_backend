@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -210,11 +211,32 @@ func (uc *VTUUsecase) compensateWallet(sagaID, reason string) {
 
 // ─── Product Catalog ────────────────────────────────────────
 
-func (uc *VTUUsecase) ListProducts(ctx context.Context, category string) ([]*domain.Product, error) {
+func (uc *VTUUsecase) ListProducts(ctx context.Context, category string, network string) ([]*domain.Product, error) {
+	category = strings.ToUpper(category)
+	network = strings.ToUpper(network)
+    
+	var products []*domain.Product
+	var err error
+
 	if category == "" {
-		return uc.productRepo.ListAll(ctx)
+		products, err = uc.productRepo.ListAll(ctx)
+	} else {
+		products, err = uc.productRepo.ListByCategory(ctx, domain.VTUCategory(category))
 	}
-	return uc.productRepo.ListByCategory(ctx, domain.VTUCategory(category))
+	if err != nil {
+		return nil, err
+	}
+	
+	if network != "" {
+		var filtered []*domain.Product
+		for _, p := range products {
+			if strings.Contains(strings.ToUpper(p.Name), network) {
+				filtered = append(filtered, p)
+			}
+		}
+		return filtered, nil
+	}
+	return products, nil
 }
 
 func (uc *VTUUsecase) CreateProduct(ctx context.Context, product *domain.Product) error {

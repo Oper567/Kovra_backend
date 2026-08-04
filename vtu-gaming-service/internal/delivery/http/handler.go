@@ -36,7 +36,8 @@ type APIResponse struct {
 
 func (h *VTUHandler) ListProducts(c *gin.Context) {
 	category := c.Query("category")
-	products, err := h.uc.ListProducts(c.Request.Context(), category)
+	network := c.Query("network")
+	products, err := h.uc.ListProducts(c.Request.Context(), category, network)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
 		return
