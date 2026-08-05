@@ -30,7 +30,7 @@ func (r *ProductRepo) ListByCategory(ctx context.Context, category domain.VTUCat
 	query := `
 		SELECT id, provider_id, category, name, description, amount, currency, provider_code, is_active
 		FROM vtu_products
-		WHERE category = $1 AND is_active = true
+		WHERE UPPER(category) = UPPER($1) AND is_active = true
 		ORDER BY amount ASC
 	`
 	rows, err := r.db.QueryContext(ctx, query, category)
