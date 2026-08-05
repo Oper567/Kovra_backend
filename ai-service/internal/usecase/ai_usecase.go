@@ -77,11 +77,34 @@ func (u *AIUsecase) GenerateLuciInsight(ctx context.Context, userID string, view
 	// 5. Prompt Construction
 	prompt := fmt.Sprintf("%s\n\nCurrent Context: %s\nUser Data: %s\n\nGenerate the insight message:", persona, viewContext, userData)
 
-	// 6. Gemini LLM Generation
-	message, _, err := u.provider.ChatCompletion(persona, []domain.ChatMessage{{Role: "user", Content: prompt}})
+	// 6. Gemini LLM Generation with Retry Logic
+	var message string
+	var err error
+	maxRetries := 3
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		message, _, err = u.provider.ChatCompletion(persona, []domain.ChatMessage{{Role: "user", Content: prompt}})
+		if err == nil {
+			break
+		}
+		
+		if u.logger != nil {
+			u.logger.Warn("[AI Usecase] Retry generating content from Gemini", "attempt", attempt+1, "error", err)
+		}
+		
+		// Wait before retrying (exponential backoff: 500ms, 1s, 2s)
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			goto ErrorHandling
+		case <-time.After(time.Duration(500*(1<<attempt)) * time.Millisecond):
+		}
+	}
+
+ErrorHandling:
 	if err != nil {
 		if u.logger != nil {
-			u.logger.Error("[AI Usecase] Error generating content from Gemini", "error", err)
+			u.logger.Error("[AI Usecase] Error generating content from Gemini after retries", "error", err)
 		}
 		// Return safe fallback silently
 		return fallbackMsg, nil
