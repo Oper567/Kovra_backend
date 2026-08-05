@@ -79,7 +79,6 @@ func (u *AIUsecase) GenerateLuciInsight(ctx context.Context, userID string, view
 
 	// 6. Gemini LLM Generation with Retry Logic
 	var message string
-	var err error
 	maxRetries := 3
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
