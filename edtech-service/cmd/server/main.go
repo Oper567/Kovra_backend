@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/gin-gonic/gin"
 	
 	"github.com/lucepay-dev/lucepay/backend/edtech-service/config"
@@ -23,6 +25,19 @@ func main() {
 	logger.Info("starting lucepay edtech-service")
 
 	cfg := config.Load()
+
+	// Connect to DB
+	dsn := "postgres://postgres.kcxsqfbepqrcfmrefqlt:MHWDUdklbdFnU4Xw@aws-1-eu-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		logger.Error("Failed to open DB", slog.String("error", err.Error()))
+	} else {
+		if err := db.Ping(); err != nil {
+			logger.Error("Failed to ping DB", slog.String("error", err.Error()))
+		} else {
+			logger.Info("Database connected for edtech-service")
+		}
+	}
 
 	// ─── Usecases ───────────────────────────────────────────
 	edtechUC := usecase.NewEdtechUsecase()
@@ -40,7 +55,7 @@ func main() {
 
 	// Register routes
 	v1 := router.Group("/api/v1")
-	edtechHandler := httpdelivery.NewEdtechHandler(edtechUC)
+	edtechHandler := httpdelivery.NewEdtechHandler(edtechUC, db)
 	edtechHandler.RegisterRoutes(v1)
 
 	quizHandler := httpdelivery.NewQuizHandler(quizUC)

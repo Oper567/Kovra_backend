@@ -412,6 +412,57 @@ func (h *EmailAuthHandler) UpdateProfile(c *gin.Context) {
 	})
 }
 
+// SubmitKycRequest represents the payload for KYC submission.
+type SubmitKycRequest struct {
+	Name          string `json:"name" binding:"required"`
+	Description   string `json:"description" binding:"required"`
+	Role          string `json:"role" binding:"required"`
+	IDDocumentURL string `json:"id_document_url"`
+}
+
+// SubmitKyc handles KYC application submissions.
+func (h *EmailAuthHandler) SubmitKyc(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req SubmitKycRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	// Insert into kyc_applications
+	_, err := h.DB.ExecContext(c.Request.Context(), `
+		INSERT INTO kyc_applications (user_id, role, business_or_tutor_name, description, id_document_url, status)
+		VALUES ($1, $2, $3, $4, $5, 'pending')
+	`, userID, req.Role, req.Name, req.Description, req.IDDocumentURL)
+
+	if err != nil {
+		h.Logger.Error("failed to insert kyc application", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit KYC application"})
+		return
+	}
+
+	// Update user's kyc_status
+	_, err = h.DB.ExecContext(c.Request.Context(), `
+		UPDATE users SET kyc_status = 'pending', requested_role = $1, updated_at = NOW() WHERE id = $2
+	`, req.Role, userID)
+
+	if err != nil {
+		h.Logger.Error("failed to update user kyc status", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "KYC application submitted successfully",
+	})
+}
+
 func (h *EmailAuthHandler) sendVerificationEmail(ctx context.Context, email string) error {
 	// Generate 6-digit code
 	codeInt, err := rand.Int(rand.Reader, big.NewInt(900000))

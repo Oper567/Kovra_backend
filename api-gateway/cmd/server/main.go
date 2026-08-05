@@ -174,6 +174,7 @@ func main() {
 		// User profile (local auth handler)
 		auth.GET("/user/profile", emailAuthHandler.GetProfile)
 		auth.PUT("/user/profile", emailAuthHandler.UpdateProfile)
+		auth.POST("/user/kyc", emailAuthHandler.SubmitKyc)
 	}
 
 	// ─── Marketplace Routes (Mixed Auth) ────────────────────

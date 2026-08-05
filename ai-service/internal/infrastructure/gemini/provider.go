@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/lucepay-dev/lucepay/backend/ai-service/internal/domain"
@@ -33,8 +34,9 @@ func NewGeminiProvider(ctx context.Context, apiKey string, logger *slog.Logger) 
 }
 
 func (p *geminiProvider) ChatCompletion(systemPrompt string, messages []domain.ChatMessage) (string, int, error) {
-	ctx := context.Background()
-	model := p.client.GenerativeModel("gemini-1.5-flash-latest")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	model := p.client.GenerativeModel("gemini-1.5-flash")
 	model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
 	
 	cs := model.StartChat()
@@ -90,8 +92,9 @@ func (p *geminiProvider) ChatCompletion(systemPrompt string, messages []domain.C
 }
 
 func (p *geminiProvider) GenerateInsights(transactions []domain.TransactionSummary) ([]domain.InsightResult, error) {
-	ctx := context.Background()
-	model := p.client.GenerativeModel("gemini-1.5-flash-latest")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	model := p.client.GenerativeModel("gemini-1.5-flash")
 	model.ResponseMIMEType = "application/json"
 
 	data, _ := json.Marshal(transactions)
@@ -118,8 +121,9 @@ func (p *geminiProvider) GenerateInsights(transactions []domain.TransactionSumma
 }
 
 func (p *geminiProvider) GenerateRecommendations(profile domain.UserProfile) ([]domain.RecommendationResult, error) {
-	ctx := context.Background()
-	model := p.client.GenerativeModel("gemini-1.5-flash-latest")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	model := p.client.GenerativeModel("gemini-1.5-flash")
 	model.ResponseMIMEType = "application/json"
 
 	data, _ := json.Marshal(profile)
