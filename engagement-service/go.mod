@@ -4,6 +4,7 @@ go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.12.0
+	github.com/lib/pq v1.12.3
 	github.com/shopspring/decimal v1.4.0
 )
 
