@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lucepay-dev/lucepay/backend/vtu-gaming-service/internal/domain"
@@ -35,8 +36,8 @@ type APIResponse struct {
 }
 
 func (h *VTUHandler) ListProducts(c *gin.Context) {
-	category := c.Query("category")
-	network := c.Query("network")
+	category := strings.ToUpper(c.Query("category"))
+	network := strings.ToUpper(c.Query("network"))
 	products, err := h.uc.ListProducts(c.Request.Context(), category, network)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
