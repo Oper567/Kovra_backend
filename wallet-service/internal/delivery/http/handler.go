@@ -43,7 +43,7 @@ func (h *WalletHandler) RegisterRoutes(r *gin.RouterGroup) {
 	}
 	
 	// Webhooks
-	r.POST("/wallet/webhook/paystack", h.PaystackWebhook)
+	r.POST("/webhooks/paystack", h.PaystackWebhook)
 
 	// Internal Saga Endpoints (called directly by other microservices)
 	saga := r.Group("/internal/wallet/saga")
@@ -359,7 +359,7 @@ func (h *WalletHandler) FundInitialize(c *gin.Context) {
 // PaystackWebhook godoc
 // @Summary Paystack Webhook endpoint
 // @Tags wallet
-// @Router /wallet/webhook/paystack [post]
+// @Router /webhooks/paystack [post]
 func (h *WalletHandler) PaystackWebhook(c *gin.Context) {
 	log.Println("PAYSTACK WEBHOOK HIT: Attempting to process...")
 
