@@ -135,7 +135,10 @@ func main() {
 		// pub.POST("/auth/refresh", emailAuthHandler.Refresh) // TODO: Implement token refresh if needed
 
 		// Public Wallet Webhooks (Paystack)
-		pub.POST("/paystack-webhook", middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
+		pub.POST("/wallet/webhook/paystack", func(c *gin.Context) {
+			slog.Info("GATEWAY: Received incoming Paystack webhook", slog.String("path", c.Request.URL.Path), slog.String("method", c.Request.Method))
+			c.Next()
+		}, middleware.CircuitBreakerMiddleware(walletCB, "wallet-service"), walletProxy.Forward(""))
 	}
 
 	// ─── Authenticated Routes ───────────────────────────────

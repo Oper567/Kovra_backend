@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ func (h *WalletHandler) RegisterRoutes(r *gin.RouterGroup) {
 	}
 	
 	// Webhooks
-	r.POST("/paystack-webhook", h.PaystackWebhook)
+	r.POST("/wallet/webhook/paystack", h.PaystackWebhook)
 
 	// Internal Saga Endpoints (called directly by other microservices)
 	saga := r.Group("/internal/wallet/saga")
@@ -360,6 +361,8 @@ func (h *WalletHandler) FundInitialize(c *gin.Context) {
 // @Tags wallet
 // @Router /wallet/webhook/paystack [post]
 func (h *WalletHandler) PaystackWebhook(c *gin.Context) {
+	log.Println("PAYSTACK WEBHOOK HIT: Attempting to process...")
+
 	// 1. Verify Signature
 	signature := c.GetHeader("x-paystack-signature")
 	payload, err := io.ReadAll(c.Request.Body)
@@ -369,6 +372,7 @@ func (h *WalletHandler) PaystackWebhook(c *gin.Context) {
 	}
 
 	if !h.paystack.VerifyWebhookSignature(payload, signature) {
+		log.Println("[PAYSTACK WEBHOOK] Signature validation failed")
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}

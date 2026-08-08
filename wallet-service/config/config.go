@@ -94,9 +94,19 @@ func Load() *Config {
 			URL: envOrDefault("RABBITMQ_URL", "amqp://lucepay:lucepay_mq_2024@localhost:5672/"),
 		},
 		Paystack: PaystackConfig{
-			SecretKey: envOrDefault("PAYSTACK_SECRET_KEY", ""),
+			SecretKey: getPaystackKey(),
 		},
 	}
+}
+
+func getPaystackKey() string {
+	if v := os.Getenv("PAYSTACK_LIVE_SECRET_KEY"); v != "" {
+		return v
+	}
+	if v := os.Getenv("PAYSTACK_TEST_SECRET_KEY"); v != "" {
+		return v
+	}
+	return envOrDefault("PAYSTACK_SECRET_KEY", "")
 }
 
 func envOrDefault(key, fallback string) string {
