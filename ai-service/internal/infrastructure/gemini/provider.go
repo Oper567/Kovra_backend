@@ -36,7 +36,7 @@ func NewGeminiProvider(ctx context.Context, apiKey string, logger *slog.Logger) 
 func (p *geminiProvider) ChatCompletion(systemPrompt string, messages []domain.ChatMessage) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	model := p.client.GenerativeModel("gemini-2.0-flash")
+	model := p.client.GenerativeModel("gemini-2.5-flash")
 	model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
 	
 	cs := model.StartChat()
@@ -94,7 +94,7 @@ func (p *geminiProvider) ChatCompletion(systemPrompt string, messages []domain.C
 func (p *geminiProvider) GenerateInsights(transactions []domain.TransactionSummary) ([]domain.InsightResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	model := p.client.GenerativeModel("gemini-2.0-flash")
+	model := p.client.GenerativeModel("gemini-2.5-flash")
 	model.ResponseMIMEType = "application/json"
 
 	data, _ := json.Marshal(transactions)
@@ -123,7 +123,7 @@ func (p *geminiProvider) GenerateInsights(transactions []domain.TransactionSumma
 func (p *geminiProvider) GenerateRecommendations(profile domain.UserProfile) ([]domain.RecommendationResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	model := p.client.GenerativeModel("gemini-2.0-flash")
+	model := p.client.GenerativeModel("gemini-2.5-flash")
 	model.ResponseMIMEType = "application/json"
 
 	data, _ := json.Marshal(profile)
@@ -147,4 +147,58 @@ func (p *geminiProvider) GenerateRecommendations(profile domain.UserProfile) ([]
 	}
 
 	return nil, fmt.Errorf("empty response for recommendations")
+}
+
+func (p *geminiProvider) EvaluateMerchant(ctx context.Context, storeName, description string) (string, error) {
+	model := p.client.GenerativeModel("gemini-2.5-flash")
+	model.ResponseMIMEType = "application/json"
+	
+	prompt := fmt.Sprintf(`Evaluate the following merchant application. If the store name and description seem legitimate and appropriate for a marketplace, return status "approved". Otherwise, return "rejected".
+	Store Name: %s
+	Description: %s
+	
+	Return ONLY a JSON object with key "status" and value either "approved" or "rejected".`, storeName, description)
+
+	res, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return "", err
+	}
+
+	if len(res.Candidates) > 0 && len(res.Candidates[0].Content.Parts) > 0 {
+		jsonStr := fmt.Sprintf("%v", res.Candidates[0].Content.Parts[0])
+		var result map[string]string
+		if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
+			if status, ok := result["status"]; ok {
+				return status, nil
+			}
+		}
+	}
+	return "pending", fmt.Errorf("could not evaluate merchant")
+}
+
+func (p *geminiProvider) EvaluateTutor(ctx context.Context, displayName, bio string) (string, error) {
+	model := p.client.GenerativeModel("gemini-2.5-flash")
+	model.ResponseMIMEType = "application/json"
+	
+	prompt := fmt.Sprintf(`Evaluate the following tutor application. If the display name and bio seem legitimate and appropriate for an educational platform, return status "approved". Otherwise, return "rejected".
+	Display Name: %s
+	Bio: %s
+	
+	Return ONLY a JSON object with key "status" and value either "approved" or "rejected".`, displayName, bio)
+
+	res, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return "", err
+	}
+
+	if len(res.Candidates) > 0 && len(res.Candidates[0].Content.Parts) > 0 {
+		jsonStr := fmt.Sprintf("%v", res.Candidates[0].Content.Parts[0])
+		var result map[string]string
+		if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
+			if status, ok := result["status"]; ok {
+				return status, nil
+			}
+		}
+	}
+	return "pending", fmt.Errorf("could not evaluate tutor")
 }

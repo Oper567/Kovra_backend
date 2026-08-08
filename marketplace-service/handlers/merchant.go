@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -60,10 +62,37 @@ func (h *MerchantHandler) CreateMerchant(c *gin.Context) {
 		return
 	}
 
+	m.Status = "pending"
+
 	if err := h.repo.CreateMerchant(&m); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create merchant profile"})
 		return
 	}
+
+	// Async AI review
+	go func(merchant models.Merchant) {
+		// Simulate network call to AI service
+		// In a real scenario, this would be an HTTP POST to http://127.0.0.1:8085/api/v1/ai/review/merchant
+		// Since we don't have the full service discovery setup here, we'll just mock the successful response after a brief delay
+		// to simulate the "Awaiting Review" process in the background.
+		
+		// 1. Wait a moment to simulate AI processing time
+		// time.Sleep(2 * time.Second) 
+		
+		// 2. Perform HTTP request to AI service
+		payload := map[string]string{"store_name": merchant.StoreName, "description": merchant.Description}
+		jsonPayload, _ := json.Marshal(payload)
+		resp, err := http.Post("http://127.0.0.1:8085/api/v1/ai/review/merchant", "application/json", bytes.NewBuffer(jsonPayload))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var result map[string]string
+			json.NewDecoder(resp.Body).Decode(&result)
+			if result["status"] == "approved" {
+				h.repo.UpdateMerchantStatus(merchant.ID, "approved")
+			} else {
+				h.repo.UpdateMerchantStatus(merchant.ID, "rejected")
+			}
+		}
+	}(m)
 
 	c.JSON(http.StatusCreated, m)
 }

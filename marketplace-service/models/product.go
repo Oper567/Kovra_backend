@@ -23,6 +23,7 @@ type Merchant struct {
 	StoreName    string    `json:"store_name"`
 	Description  string    `json:"description"`
 	LogoURL      string    `json:"logo_url"`
+	Status       string    `json:"status"` // pending, approved, rejected
 	TotalSales   float64   `json:"total_sales"`
 	TotalOrders  int       `json:"total_orders"`
 	CreatedAt    time.Time `json:"created_at"`

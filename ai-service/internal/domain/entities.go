@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -75,6 +76,9 @@ type AIProvider interface {
 
 	// GenerateRecommendations produces personalized recommendations.
 	GenerateRecommendations(userProfile UserProfile) ([]RecommendationResult, error)
+
+	EvaluateMerchant(ctx context.Context, storeName, description string) (string, error)
+	EvaluateTutor(ctx context.Context, displayName, bio string) (string, error)
 }
 
 // TransactionSummary is a lightweight view of transactions for AI analysis.

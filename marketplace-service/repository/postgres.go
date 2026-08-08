@@ -24,6 +24,7 @@ func (r *PostgresRepository) InitSchema() error {
 			store_name VARCHAR(255) NOT NULL,
 			description TEXT,
 			logo_url VARCHAR(255),
+			status VARCHAR(20) DEFAULT 'pending',
 			total_sales DECIMAL(15,2) DEFAULT 0,
 			total_orders INT DEFAULT 0,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -87,23 +88,23 @@ func (r *PostgresRepository) GetProducts() ([]models.Product, error) {
 
 func (r *PostgresRepository) CreateMerchant(m *models.Merchant) error {
 	query := `
-		INSERT INTO merchants (user_id, store_name, description, logo_url, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO merchants (user_id, store_name, description, logo_url, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, total_sales, total_orders
 	`
 	now := time.Now()
 	m.CreatedAt = now
 	m.UpdatedAt = now
 	return r.db.QueryRow(
-		query, m.UserID, m.StoreName, m.Description, m.LogoURL, m.CreatedAt, m.UpdatedAt,
+		query, m.UserID, m.StoreName, m.Description, m.LogoURL, m.Status, m.CreatedAt, m.UpdatedAt,
 	).Scan(&m.ID, &m.TotalSales, &m.TotalOrders)
 }
 
 func (r *PostgresRepository) GetMerchantByUserID(userID string) (*models.Merchant, error) {
-	query := `SELECT id, user_id, store_name, description, logo_url, total_sales, total_orders, created_at, updated_at FROM merchants WHERE user_id = $1`
+	query := `SELECT id, user_id, store_name, description, logo_url, status, total_sales, total_orders, created_at, updated_at FROM merchants WHERE user_id = $1`
 	var m models.Merchant
 	err := r.db.QueryRow(query, userID).Scan(
-		&m.ID, &m.UserID, &m.StoreName, &m.Description, &m.LogoURL, &m.TotalSales, &m.TotalOrders, &m.CreatedAt, &m.UpdatedAt,
+		&m.ID, &m.UserID, &m.StoreName, &m.Description, &m.LogoURL, &m.Status, &m.TotalSales, &m.TotalOrders, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil // Return nil, nil if no merchant found
@@ -112,4 +113,10 @@ func (r *PostgresRepository) GetMerchantByUserID(userID string) (*models.Merchan
 		return nil, err
 	}
 	return &m, nil
+}
+
+func (r *PostgresRepository) UpdateMerchantStatus(id, status string) error {
+	query := `UPDATE merchants SET status = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.db.Exec(query, status, time.Now(), id)
+	return err
 }

@@ -1,7 +1,9 @@
 package http
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +28,7 @@ func NewEdtechHandler(uc *usecase.EdtechUsecase, db *sql.DB) *EdtechHandler {
 func (h *EdtechHandler) RegisterRoutes(r *gin.RouterGroup) {
 	edtech := r.Group("/edtech")
 	{
+		edtech.POST("/tutor", h.CreateTutor)
 		edtech.POST("/execute-code", h.ExecuteCode)
 		edtech.POST("/certificate/purchase", h.PurchaseCertificate)
 		edtech.GET("/tutor/dashboard", h.GetDashboardData)
@@ -87,11 +90,11 @@ func (h *EdtechHandler) GetDashboardData(c *gin.Context) {
 	}
 
 	// Fetch tutor metrics from DB
-	var tutorID string
-	err := h.db.QueryRowContext(c.Request.Context(), "SELECT id FROM edtech_tutors WHERE user_id = $1", userID).Scan(&tutorID)
+	var tutorID, status string
+	err := h.db.QueryRowContext(c.Request.Context(), "SELECT id, status FROM edtech_tutors WHERE user_id = $1", userID).Scan(&tutorID, &status)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"metrics": gin.H{"total_students": 0, "active_courses": 0, "quizzes_taken": 0, "total_earnings": 0}, "courses": []any{}}})
+			c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"status": "none", "metrics": gin.H{"total_students": 0, "active_courses": 0, "quizzes_taken": 0, "total_earnings": 0}, "courses": []any{}}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, APIResponse{Success: false, Error: "Database error"})
@@ -127,6 +130,7 @@ func (h *EdtechHandler) GetDashboardData(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
+			"status": status,
 			"metrics": gin.H{
 				"total_students": totalStudents,
 				"active_courses": activeCourses,
@@ -136,6 +140,60 @@ func (h *EdtechHandler) GetDashboardData(c *gin.Context) {
 			"courses": courses,
 		},
 	})
+}
+
+type CreateTutorRequest struct {
+	DisplayName     string   `json:"display_name" binding:"required"`
+	Bio             string   `json:"bio"`
+	AvatarURL       string   `json:"avatar_url"`
+	Specializations []string `json:"specializations"`
+}
+
+func (h *EdtechHandler) CreateTutor(c *gin.Context) {
+	var req CreateTutorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{Success: false, Error: "Invalid payload"})
+		return
+	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = c.GetHeader("X-User-ID")
+	}
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, APIResponse{Success: false, Error: "Unauthorized"})
+		return
+	}
+
+	// Insert tutor with pending status
+	var tutorID string
+	query := `INSERT INTO edtech_tutors (user_id, display_name, bio, avatar_url, status) 
+			  VALUES ($1, $2, $3, $4, 'pending') RETURNING id`
+	
+	err := h.db.QueryRowContext(c.Request.Context(), query, userID, req.DisplayName, req.Bio, req.AvatarURL).Scan(&tutorID)
+	if err != nil {
+		c.JSON(http.StatusConflict, APIResponse{Success: false, Error: "User is already a tutor or db error"})
+		return
+	}
+
+	// Async AI review
+	go func(id, name, bio string) {
+		// Simulate network call to AI service
+		payload := map[string]string{"display_name": name, "bio": bio}
+		jsonPayload, _ := json.Marshal(payload)
+		resp, err := http.Post("http://127.0.0.1:8085/api/v1/ai/review/tutor", "application/json", bytes.NewBuffer(jsonPayload))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var result map[string]string
+			json.NewDecoder(resp.Body).Decode(&result)
+			if result["status"] == "approved" {
+				h.db.Exec("UPDATE edtech_tutors SET status = 'approved' WHERE id = $1", id)
+			} else {
+				h.db.Exec("UPDATE edtech_tutors SET status = 'rejected' WHERE id = $1", id)
+			}
+		}
+	}(tutorID, req.DisplayName, req.Bio)
+
+	c.JSON(http.StatusOK, APIResponse{Success: true, Data: gin.H{"id": tutorID, "status": "pending"}})
 }
 
 func (h *EdtechHandler) GetActiveAssessment(c *gin.Context) {

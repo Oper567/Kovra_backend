@@ -115,3 +115,17 @@ ErrorHandling:
 
 	return message, nil
 }
+
+func (u *AIUsecase) EvaluateMerchant(ctx context.Context, storeName, description string) (string, error) {
+	if u.provider == nil {
+		return "pending", fmt.Errorf("ai provider not configured")
+	}
+	return u.provider.EvaluateMerchant(ctx, storeName, description)
+}
+
+func (u *AIUsecase) EvaluateTutor(ctx context.Context, displayName, bio string) (string, error) {
+	if u.provider == nil {
+		return "pending", fmt.Errorf("ai provider not configured")
+	}
+	return u.provider.EvaluateTutor(ctx, displayName, bio)
+}
