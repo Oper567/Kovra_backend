@@ -64,6 +64,10 @@ func NewEmailAuthHandler(db *sql.DB, rdb *redis.Client, cfg *config.Config, logg
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS provider VARCHAR(50) DEFAULT 'email';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_id VARCHAR(255);
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'user';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN NOT NULL DEFAULT FALSE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_status VARCHAR(50) DEFAULT 'none';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS requested_role VARCHAR(50);
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_url TEXT;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
@@ -342,7 +346,7 @@ func (h *EmailAuthHandler) GetProfile(c *gin.Context) {
 	var email, fullName, avatarURL, role string
 	var isVerified bool
 	err := h.DB.QueryRowContext(c.Request.Context(), `
-		SELECT email, COALESCE(full_name, ''), COALESCE(avatar_url, ''), role, is_verified 
+		SELECT email, COALESCE(name, ''), COALESCE(avatar_url, ''), role, is_verified 
 		FROM users WHERE id = $1
 	`, userID).Scan(&email, &fullName, &avatarURL, &role, &isVerified)
 
@@ -389,7 +393,7 @@ func (h *EmailAuthHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	if req.FullName != nil {
-		_, err := h.DB.ExecContext(c.Request.Context(), "UPDATE users SET full_name = $1, updated_at = NOW() WHERE id = $2", *req.FullName, userID)
+		_, err := h.DB.ExecContext(c.Request.Context(), "UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2", *req.FullName, userID)
 		if err != nil {
 			h.Logger.Error("failed to update user full_name", slog.String("error", err.Error()))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update full name"})

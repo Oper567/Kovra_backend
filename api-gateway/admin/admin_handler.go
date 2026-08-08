@@ -52,7 +52,7 @@ func (h *AdminHandler) GetStats(c *gin.Context) {
 
 func (h *AdminHandler) GetUsers(c *gin.Context) {
 	// Fetch users from auth DB
-	rows, err := h.db.QueryContext(c.Request.Context(), "SELECT id, full_name, email, is_suspended FROM users LIMIT 50")
+	rows, err := h.db.QueryContext(c.Request.Context(), "SELECT id, name, email, is_suspended FROM users LIMIT 50")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Database error"})
 		return
@@ -112,7 +112,7 @@ func (h *AdminHandler) GetTransactions(c *gin.Context) {
 
 func (h *AdminHandler) GetPendingKYC(c *gin.Context) {
 	// Fetch from users table where kyc_status is pending
-	rows, err := h.db.QueryContext(c.Request.Context(), "SELECT id, full_name, kyc_role, kyc_document_url FROM users WHERE kyc_status = 'pending'")
+	rows, err := h.db.QueryContext(c.Request.Context(), "SELECT id, name, requested_role, kyc_document_url FROM users WHERE kyc_status = 'pending'")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Database error"})
 		return
