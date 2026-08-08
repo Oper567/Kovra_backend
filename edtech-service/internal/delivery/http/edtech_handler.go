@@ -33,6 +33,8 @@ func (h *EdtechHandler) RegisterRoutes(r *gin.RouterGroup) {
 		edtech.POST("/certificate/purchase", h.PurchaseCertificate)
 		edtech.GET("/tutor/dashboard", h.GetDashboardData)
 		edtech.GET("/assessment/active", h.GetActiveAssessment)
+		edtech.GET("/tutors/top", h.GetTopTutors)
+		edtech.GET("/courses/my-learning", h.GetMyLearning)
 	}
 }
 
@@ -208,6 +210,36 @@ func (h *EdtechHandler) GetActiveAssessment(c *gin.Context) {
 				"ai_feedback": false,
 			},
 			"submissions": []any{},
+		},
+	})
+}
+
+func (h *EdtechHandler) GetTopTutors(c *gin.Context) {
+	// Stub implementation returning top tutors
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": []map[string]any{
+			{"name": "Dr. Sarah", "subject": "Data Science", "rating": 4.9},
+			{"name": "Prof. John", "subject": "Engineering", "rating": 4.8},
+			{"name": "Alice M.", "subject": "UI/UX Design", "rating": 5.0},
+			{"name": "Mike T.", "subject": "Golang", "rating": 4.7},
+			{"name": "Emma W.", "subject": "Marketing", "rating": 4.9},
+		},
+	})
+}
+
+func (h *EdtechHandler) GetMyLearning(c *gin.Context) {
+	// Stub implementation returning a user's enrolled courses
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": []map[string]any{
+			{
+				"id": "course-123",
+				"title": "Advanced Flutter & Go",
+				"module": "Module 4: Microservices",
+				"progress": 0.65,
+				"is_completed": false,
+			},
 		},
 	})
 }

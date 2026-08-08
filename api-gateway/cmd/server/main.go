@@ -18,6 +18,7 @@ import (
 	"github.com/markbates/goth/providers/google"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/lucepay-dev/lucepay/backend/api-gateway/admin"
 	"github.com/lucepay-dev/lucepay/backend/api-gateway/auth"
 	"github.com/lucepay-dev/lucepay/backend/api-gateway/config"
 	"github.com/lucepay-dev/lucepay/backend/api-gateway/middleware"
@@ -86,6 +87,7 @@ func main() {
 	// ─── Handlers ───────────────────────────────────────────
 	oauthHandler := auth.NewOAuthHandler(db, cfg, logger)
 	emailAuthHandler := auth.NewEmailAuthHandler(db, rdb, cfg, logger)
+	adminHandler := admin.NewAdminHandler(db, cfg.NotificationServiceURL)
 
 	// ─── Router ─────────────────────────────────────────────
 	gin.SetMode(gin.ReleaseMode)
@@ -179,6 +181,11 @@ func main() {
 		auth.PUT("/user/profile", emailAuthHandler.UpdateProfile)
 		auth.POST("/user/kyc", emailAuthHandler.SubmitKyc)
 	}
+
+	// ─── Admin Routes (Optional Auth for Mock Phase) ────────
+	adminGroup := r.Group("/api/v1")
+	adminGroup.Use(corsMiddleware()) // Ensure CORS is allowed for the frontend admin portal
+	adminHandler.RegisterRoutes(adminGroup)
 
 	// ─── Marketplace Routes (Mixed Auth) ────────────────────
 	market := r.Group("/api/v1/marketplace")
